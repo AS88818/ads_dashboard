@@ -185,12 +185,29 @@ function renderSearchQueries(searchQueries) {
 // Location ID to name mapping (Google Ads Geo Criterion IDs)
 const locationNames = {
     2458: 'Malaysia',
-    2360: 'Vietnam',
     2702: 'Singapore',
     2764: 'Thailand',
-    2360: 'Indonesia',
+    2360: 'Vietnam',
+    2356: 'India',
+    2050: 'Australia',
+    2586: 'Pakistan',
+    2566: 'New Zealand',
+    2288: 'Japan',
+    2231: 'Hong Kong',
     2156: 'China',
-    2356: 'India'
+    2840: 'United States',
+    2826: 'United Kingdom',
+    2276: 'Germany',
+    2250: 'France',
+    2380: 'Italy',
+    2036: 'Spain',
+    2124: 'Canada',
+    2076: 'Brazil',
+    2484: 'Mexico',
+    2410: 'South Korea',
+    2158: 'Taiwan',
+    2608: 'Philippines',
+    2360: 'Indonesia'
 };
 
 function renderGeoPerformance(geoData) {

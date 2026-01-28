@@ -405,10 +405,11 @@ def fetch_geographic_metrics(client, customer_id, start_date, end_date):
                 targeting_location = None
                 location_name = None
 
-                if hasattr(row.user_location_view, 'targeting_location') and row.user_location_view.targeting_location:
-                    targeting_location = row.user_location_view.targeting_location
-                    # Extract location ID from resource name like "geoTargetConstants/12345"
-                    if targeting_location and '/' in targeting_location:
+                if hasattr(row.user_location_view, 'targeting_location'):
+                    tl = row.user_location_view.targeting_location
+                    # targeting_location is a resource name string like "geoTargetConstants/12345"
+                    if tl and isinstance(tl, str) and '/' in tl:
+                        targeting_location = tl
                         location_id = targeting_location.split('/')[-1]
                         # Try to get location name from cache or API
                         if location_id in location_cache:
