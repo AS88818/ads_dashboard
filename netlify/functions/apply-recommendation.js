@@ -164,14 +164,14 @@ exports.handler = async (event, context) => {
 
     try {
         const body = JSON.parse(event.body || '{}');
-        const { action_type, target_id, keyword, suggested_action } = body;
+        const { action_type, target_id, keyword, suggested_action, campaign_id, match_type } = body;
 
-        if (!action_type || !target_id) {
+        if (!action_type) {
             return {
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({
-                    error: 'Missing required fields: action_type and target_id'
+                    error: 'Missing required field: action_type'
                 })
             };
         }
@@ -185,39 +185,64 @@ exports.handler = async (event, context) => {
         switch (action_type) {
             case 'keyword_action':
                 if (suggested_action === 'PAUSED' || suggested_action?.includes('PAUSED')) {
+                    if (!target_id) {
+                        return {
+                            statusCode: 400,
+                            headers,
+                            body: JSON.stringify({ error: 'Missing target_id for pause action' })
+                        };
+                    }
                     result = await pauseKeyword(customer, target_id);
                     message = `Successfully paused keyword "${keyword}"`;
                 } else if (suggested_action === 'ENABLED') {
+                    if (!target_id) {
+                        return {
+                            statusCode: 400,
+                            headers,
+                            body: JSON.stringify({ error: 'Missing target_id for enable action' })
+                        };
+                    }
                     result = await enableKeyword(customer, target_id);
                     message = `Successfully enabled keyword "${keyword}"`;
-                } else if (suggested_action?.includes('negative keyword')) {
-                    // Extract campaign ID from the recommendation context
-                    // For now, we'll need the campaign ID to be passed
-                    return {
-                        statusCode: 400,
-                        headers,
-                        body: JSON.stringify({
-                            error: 'Adding negative keywords requires campaign_id to be specified',
-                            suggestion: 'Please add negative keywords manually in Google Ads UI for now'
-                        })
-                    };
                 } else {
                     // Default to pause for keyword actions
+                    if (!target_id) {
+                        return {
+                            statusCode: 400,
+                            headers,
+                            body: JSON.stringify({ error: 'Missing target_id for keyword action' })
+                        };
+                    }
                     result = await pauseKeyword(customer, target_id);
                     message = `Successfully paused keyword "${keyword}"`;
                 }
                 break;
 
+            case 'add_negative_keyword':
+                if (!campaign_id || !keyword) {
+                    return {
+                        statusCode: 400,
+                        headers,
+                        body: JSON.stringify({
+                            error: 'Adding negative keywords requires campaign_id and keyword'
+                        })
+                    };
+                }
+                result = await addNegativeKeyword(customer, campaign_id, keyword, match_type || 'PHRASE');
+                message = `Successfully added "${keyword}" as negative keyword (${match_type || 'PHRASE'} match)`;
+                break;
+
             case 'bid_adjustment':
-                // Bid adjustments are more complex and risky
-                // For safety, we'll just return a message suggesting manual action
+                // Bid adjustments require user input for the new bid amount
+                // Return instructions instead of making changes
                 return {
                     statusCode: 200,
                     headers,
                     body: JSON.stringify({
                         success: false,
-                        message: `Bid adjustments should be done manually in Google Ads UI for keyword "${keyword}". This ensures you can review and set the exact bid amount.`,
-                        manual_action_required: true
+                        message: `Bid adjustments require you to specify the new bid amount. Please go to Google Ads UI to adjust the bid for "${keyword}".`,
+                        manual_action_required: true,
+                        google_ads_url: `https://ads.google.com/aw/keywords?campaignId=${campaign_id || ''}`
                     })
                 };
 

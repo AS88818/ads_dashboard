@@ -262,11 +262,25 @@ function renderRecommendations(recommendations) {
 
     elements.recommendationsList.innerHTML = recommendations.slice(0, 8).map((rec, index) => {
         const impact = impactMap[rec.impact?.toLowerCase()] || 'medium';
-        // Show Apply button for pause/enable keyword actions (not for negative keywords or bid adjustments)
-        const canApply = rec.action_type === 'keyword_action' &&
-                         rec.keyword &&
-                         rec.target_id?.includes('adGroupCriteria') &&
-                         (rec.suggested_action === 'PAUSED' || rec.suggested_action === 'ENABLED');
+
+        // Determine if action can be applied automatically
+        let canApply = false;
+        let buttonLabel = 'Apply';
+
+        if (rec.action_type === 'keyword_action' && rec.keyword && rec.target_id?.includes('adGroupCriteria')) {
+            // Pause/Enable keywords
+            canApply = rec.suggested_action === 'PAUSED' || rec.suggested_action === 'ENABLED';
+            buttonLabel = rec.suggested_action === 'PAUSED' ? 'Pause' : 'Enable';
+        } else if (rec.action_type === 'add_negative_keyword' && rec.keyword && rec.campaign_id) {
+            // Add negative keywords (requires campaign_id)
+            canApply = true;
+            buttonLabel = 'Add Negative';
+        } else if (rec.action_type === 'bid_adjustment') {
+            // Bid adjustments open Google Ads UI
+            canApply = true;
+            buttonLabel = 'Review';
+        }
+
         return `
             <div class="recommendation-item">
                 <div class="recommendation-content">
@@ -275,7 +289,7 @@ function renderRecommendations(recommendations) {
                 </div>
                 <div class="recommendation-actions">
                     <span class="impact-badge ${impact}">${rec.impact || 'Medium'} Impact</span>
-                    ${canApply ? `<button class="action-btn" onclick="applyRecommendation(${index})">Apply</button>` : ''}
+                    ${canApply ? `<button class="action-btn" onclick="applyRecommendation(${index})">${buttonLabel}</button>` : ''}
                 </div>
             </div>
         `;
@@ -438,14 +452,27 @@ async function applyRecommendation(index) {
         return;
     }
 
-    const confirmed = confirm(
-        `Are you sure you want to apply this recommendation?\n\n` +
-        `Action: ${rec.title}\n` +
-        `This will ${rec.suggested_action || 'modify'} the keyword "${rec.keyword}" in Google Ads.\n\n` +
-        `Note: This action requires the Netlify function to have Google Ads API access configured.`
-    );
+    // Build confirmation message based on action type
+    let confirmMessage = '';
+    if (rec.action_type === 'keyword_action') {
+        const action = rec.suggested_action === 'PAUSED' ? 'pause' : 'enable';
+        confirmMessage = `Are you sure you want to ${action} the keyword "${rec.keyword}"?\n\nThis will immediately ${action} this keyword in Google Ads.`;
+    } else if (rec.action_type === 'add_negative_keyword') {
+        confirmMessage = `Are you sure you want to add "${rec.keyword}" as a negative keyword?\n\nThis will prevent your ads from showing for searches containing this term.`;
+    } else if (rec.action_type === 'bid_adjustment') {
+        // For bid adjustments, open Google Ads UI instead
+        const url = rec.campaign_id
+            ? `https://ads.google.com/aw/keywords?campaignId=${rec.campaign_id}`
+            : 'https://ads.google.com/aw/keywords';
+        if (confirm(`Bid adjustments should be done manually to set the exact amount.\n\nWould you like to open Google Ads to adjust the bid for "${rec.keyword}"?`)) {
+            window.open(url, '_blank');
+        }
+        return;
+    } else {
+        confirmMessage = `Are you sure you want to apply this recommendation?\n\nAction: ${rec.title}`;
+    }
 
-    if (!confirmed) return;
+    if (!confirm(confirmMessage)) return;
 
     try {
         const response = await fetch('/.netlify/functions/apply-recommendation', {
@@ -455,22 +482,32 @@ async function applyRecommendation(index) {
                 action_type: rec.action_type,
                 target_id: rec.target_id,
                 keyword: rec.keyword,
-                suggested_action: rec.suggested_action
+                suggested_action: rec.suggested_action,
+                campaign_id: rec.campaign_id,
+                match_type: rec.match_type || 'PHRASE'
             })
         });
 
+        const result = await response.json();
+
         if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.message || 'Failed to apply recommendation');
+            throw new Error(result.error || result.message || 'Failed to apply recommendation');
         }
 
-        alert('Recommendation applied successfully! The change will be reflected in Google Ads shortly.');
-        // Reload data to show updated status
-        await loadData();
+        if (result.manual_action_required) {
+            alert(result.message);
+            if (result.google_ads_url) {
+                window.open(result.google_ads_url, '_blank');
+            }
+        } else {
+            alert(result.message || 'Recommendation applied successfully!');
+            // Reload data to show updated status
+            await loadData();
+        }
 
     } catch (error) {
         console.error('Error applying recommendation:', error);
-        alert(`Failed to apply recommendation: ${error.message}\n\nNote: Make sure the Google Ads API credentials are configured in Netlify environment variables.`);
+        alert(`Failed to apply recommendation: ${error.message}\n\nMake sure Google Ads API credentials are configured in Netlify.`);
     }
 }
 

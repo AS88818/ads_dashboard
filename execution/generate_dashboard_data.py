@@ -177,19 +177,40 @@ def generate_dashboard_data(metrics_file, recs_file, output_file):
         })
 
     # Add recommendations with action data
+    # Get campaign ID mapping for negative keyword recommendations
+    campaign_id_map = {c.get('name', ''): c.get('id') for c in campaigns}
+
     for rec in recs_list[:8]:
         action = rec.get('action', 'review').replace('_', ' ').title()
         keyword = rec.get('keyword', '')
         target = rec.get('target', '')
+        suggested = rec.get('suggested', '')
+        rec_type = rec.get('type', 'review')
+
+        # Determine action_type for the frontend
+        if 'negative keyword' in suggested.lower():
+            action_type = 'add_negative_keyword'
+        elif rec_type == 'keyword_action':
+            action_type = 'keyword_action'
+        elif rec_type == 'bid_adjustment':
+            action_type = 'bid_adjustment'
+        else:
+            action_type = rec_type
+
+        # Try to extract campaign_id from the recommendation
+        campaign_name = rec.get('campaign_name', '') or rec.get('campaign', '')
+        campaign_id = rec.get('campaign_id') or campaign_id_map.get(campaign_name)
 
         dashboard_data['recommendations'].append({
             'title': f'{action}: {keyword}' if keyword else action,
             'description': rec.get('reason', ''),
             'impact': 'High' if 'wasted' in rec.get('reason', '').lower() else 'Medium',
-            'action_type': rec.get('type', 'review'),
+            'action_type': action_type,
             'target_id': target,
             'keyword': keyword,
-            'suggested_action': rec.get('suggested', '')
+            'suggested_action': suggested,
+            'campaign_id': campaign_id,
+            'match_type': 'PHRASE'  # Default to phrase match for negative keywords
         })
 
     # Save

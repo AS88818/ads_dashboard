@@ -1,7 +1,7 @@
 {
   "customer_id": "7867388610",
   "account_name": "YCK Chiropractic",
-  "generated_at": "2026-01-29T02:46:22.052042",
+  "generated_at": "2026-01-29T02:55:12.603642",
   "date_range": {
     "start_date": "2024-12-29",
     "end_date": "2025-01-28"
@@ -348,7 +348,9 @@
       "action_type": "keyword_action",
       "target_id": "customers/7867388610/adGroupCriteria/156583250855~10596601",
       "keyword": "arthritis",
-      "suggested_action": "PAUSED"
+      "suggested_action": "PAUSED",
+      "campaign_id": null,
+      "match_type": "PHRASE"
     },
     {
       "title": "Pause: carpal tunnel syndrome",
@@ -357,7 +359,9 @@
       "action_type": "keyword_action",
       "target_id": "customers/7867388610/adGroupCriteria/156583249375~13044571",
       "keyword": "carpal tunnel syndrome",
-      "suggested_action": "PAUSED"
+      "suggested_action": "PAUSED",
+      "campaign_id": null,
+      "match_type": "PHRASE"
     },
     {
       "title": "Pause: plantar fasciitis",
@@ -366,7 +370,9 @@
       "action_type": "keyword_action",
       "target_id": "customers/7867388610/adGroupCriteria/156583249895~10323771",
       "keyword": "plantar fasciitis",
-      "suggested_action": "PAUSED"
+      "suggested_action": "PAUSED",
+      "campaign_id": null,
+      "match_type": "PHRASE"
     },
     {
       "title": "Review: heel spur surgery",
@@ -375,7 +381,9 @@
       "action_type": "bid_adjustment",
       "target_id": "customers/7867388610/adGroupCriteria/156583250615~11654890",
       "keyword": "heel spur surgery",
-      "suggested_action": ""
+      "suggested_action": "",
+      "campaign_id": null,
+      "match_type": "PHRASE"
     },
     {
       "title": "Review: osteoarthritis treatment",
@@ -384,34 +392,42 @@
       "action_type": "bid_adjustment",
       "target_id": "customers/7867388610/adGroupCriteria/156583250855~11019091",
       "keyword": "osteoarthritis treatment",
-      "suggested_action": ""
+      "suggested_action": "",
+      "campaign_id": null,
+      "match_type": "PHRASE"
     },
     {
       "title": "Add Negative Keywords: frozen shoulder",
       "description": "Zero conversions from 'frozen shoulder', wasted RM 67.73",
       "impact": "High",
-      "action_type": "keyword_action",
+      "action_type": "add_negative_keyword",
       "target_id": "Frozen Shoulder",
       "keyword": "frozen shoulder",
-      "suggested_action": "Add 'frozen shoulder' as negative keyword (PHRASE match)"
+      "suggested_action": "Add 'frozen shoulder' as negative keyword (PHRASE match)",
+      "campaign_id": "20823057272",
+      "match_type": "PHRASE"
     },
     {
       "title": "Add Negative Keywords: plantar fasciitis",
       "description": "Zero conversions from 'plantar fasciitis', wasted RM 66.94",
       "impact": "High",
-      "action_type": "keyword_action",
+      "action_type": "add_negative_keyword",
       "target_id": "Plantar Faciitis",
       "keyword": "plantar fasciitis",
-      "suggested_action": "Add 'plantar fasciitis' as negative keyword (PHRASE match)"
+      "suggested_action": "Add 'plantar fasciitis' as negative keyword (PHRASE match)",
+      "campaign_id": "20823057272",
+      "match_type": "PHRASE"
     },
     {
       "title": "Add Negative Keywords: plantar fasciitis treatment",
       "description": "Zero conversions from 'plantar fasciitis treatment', wasted RM 55.03",
       "impact": "High",
-      "action_type": "keyword_action",
+      "action_type": "add_negative_keyword",
       "target_id": "Plantar Faciitis",
       "keyword": "plantar fasciitis treatment",
-      "suggested_action": "Add 'plantar fasciitis treatment' as negative keyword (PHRASE match)"
+      "suggested_action": "Add 'plantar fasciitis treatment' as negative keyword (PHRASE match)",
+      "campaign_id": "20823057272",
+      "match_type": "PHRASE"
     }
   ]
 }
