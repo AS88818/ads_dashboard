@@ -53,3 +53,7 @@ Thumbs.db
 
 # Modal
 .modal/
+
+# Node
+node_modules/
+package-lock.json
