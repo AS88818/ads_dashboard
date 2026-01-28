@@ -49,6 +49,13 @@
                     </svg>
                     <span>Keywords</span>
                 </a>
+                <a href="#search-queries" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                    </svg>
+                    <span>Search Queries</span>
+                </a>
                 <a href="#recommendations" class="nav-item">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2v4"/>
@@ -189,6 +196,30 @@
                                 </tr>
                             </thead>
                             <tbody id="keywordTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Search Queries Section -->
+                <section class="table-section" id="search-queries">
+                    <div class="section-header">
+                        <h2>Top Search Queries</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Search Query</th>
+                                    <th>Campaign</th>
+                                    <th>Impressions</th>
+                                    <th>Clicks</th>
+                                    <th>Cost</th>
+                                    <th>Conversions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="searchQueryTableBody">
                                 <!-- Populated by JavaScript -->
                             </tbody>
                         </table>

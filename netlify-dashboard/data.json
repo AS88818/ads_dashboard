@@ -1,10 +1,10 @@
 {
   "customer_id": "7867388610",
   "account_name": "YCK Chiropractic",
-  "generated_at": "2026-01-29T02:26:57.661460",
+  "generated_at": "2026-01-29T02:31:13.488631",
   "date_range": {
-    "start": "2024-12-29",
-    "end": "2025-01-28"
+    "start_date": "2024-12-29",
+    "end_date": "2025-01-28"
   },
   "summary": {
     "total_spend": 6830.76,
@@ -180,53 +180,192 @@
       "quality_score": 3
     }
   ],
+  "search_queries": [
+    {
+      "query": "plantar fasciitis",
+      "campaign": "YCK Main Search #3",
+      "impressions": 2208,
+      "clicks": 79,
+      "cost": 66.94,
+      "conversions": 0.0
+    },
+    {
+      "query": "frozen shoulder",
+      "campaign": "YCK Main Search #3",
+      "impressions": 1252,
+      "clicks": 76,
+      "cost": 67.73,
+      "conversions": 0.0
+    },
+    {
+      "query": "yap chan kor",
+      "campaign": "YCK Main Search #3",
+      "impressions": 283,
+      "clicks": 70,
+      "cost": 28.27,
+      "conversions": 0.0
+    },
+    {
+      "query": "plantar fasciitis treatment",
+      "campaign": "YCK Main Search #3",
+      "impressions": 636,
+      "clicks": 64,
+      "cost": 55.03,
+      "conversions": 0.0
+    },
+    {
+      "query": "knee pain treatment",
+      "campaign": "YCK Main Search #3",
+      "impressions": 509,
+      "clicks": 53,
+      "cost": 30.95,
+      "conversions": 0.0
+    },
+    {
+      "query": "sciatica pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 1520,
+      "clicks": 52,
+      "cost": 45.28,
+      "conversions": 0.0
+    },
+    {
+      "query": "osteoarthritis",
+      "campaign": "YCK Main Search #3",
+      "impressions": 1393,
+      "clicks": 52,
+      "cost": 46.59,
+      "conversions": 0.0
+    },
+    {
+      "query": "carpal tunnel syndrome",
+      "campaign": "YCK Main Search #3",
+      "impressions": 1267,
+      "clicks": 51,
+      "cost": 42.22,
+      "conversions": 0.0
+    },
+    {
+      "query": "paramex",
+      "campaign": "YCK Main Search #3",
+      "impressions": 2643,
+      "clicks": 42,
+      "cost": 10.29,
+      "conversions": 0.0
+    },
+    {
+      "query": "sciatica treatment",
+      "campaign": "YCK Main Search #3",
+      "impressions": 477,
+      "clicks": 42,
+      "cost": 30.29,
+      "conversions": 0.0
+    }
+  ],
   "insights": [
     {
       "type": "warning",
       "title": "Low Quality Scores",
-      "description": "Average quality score is 2.3/10. Improving ad relevance and landing pages could reduce CPC by 20-30%."
+      "description": "230 keywords have quality scores below 5. Improving ad relevance and landing pages could reduce CPC by 20-30%."
     },
     {
       "type": "alert",
-      "title": "High CPA Alert",
-      "description": "Cost per conversion is RM 6,830.76. Review conversion tracking setup and optimize for better performing keywords."
+      "title": "Wasted Ad Spend",
+      "description": "RM 713.03 spent on 28 search queries with zero conversions. Consider adding negative keywords."
     },
     {
       "type": "opportunity",
-      "title": "Top Performing Keywords",
-      "description": "\"plantar fasciitis treatment\" has 8.54% CTR - consider increasing budget allocation for this keyword."
+      "title": "Best Performing Hour: 22:00",
+      "description": "Hour 22:00 generates the most clicks (680). Consider increasing bids during peak hours."
+    },
+    {
+      "type": "opportunity",
+      "title": "Best Performing Day: Friday",
+      "description": "Friday generates the most engagement (2,001 clicks). Consider dayparting strategy."
     },
     {
       "type": "info",
       "title": "Campaign Status",
-      "description": "Main campaign \"YCK Main Search #3\" is currently PAUSED. Consider reactivating with optimized keywords."
+      "description": "All campaigns are currently PAUSED. Total historical spend: RM 6,830.76."
+    },
+    {
+      "type": "alert",
+      "title": "High CPA Alert",
+      "description": "Cost per conversion is RM 6,830.76. Review conversion tracking and keyword targeting."
     }
   ],
   "recommendations": [
     {
       "title": "Pause: arthritis",
       "description": "Quality Score of 1, 0 conversions, RM 265.40 wasted. CTR 5.3%",
-      "impact": "High"
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "customers/7867388610/adGroupCriteria/156583250855~10596601",
+      "keyword": "arthritis",
+      "suggested_action": "PAUSED"
     },
     {
       "title": "Pause: carpal tunnel syndrome",
       "description": "Quality Score of 2, 0 conversions, RM 158.55 wasted. CTR 5.4%",
-      "impact": "High"
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "customers/7867388610/adGroupCriteria/156583249375~13044571",
+      "keyword": "carpal tunnel syndrome",
+      "suggested_action": "PAUSED"
     },
     {
       "title": "Pause: plantar fasciitis",
       "description": "Quality Score of 1, 0 conversions, RM 123.39 wasted. CTR 4.2%",
-      "impact": "High"
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "customers/7867388610/adGroupCriteria/156583249895~10323771",
+      "keyword": "plantar fasciitis",
+      "suggested_action": "PAUSED"
     },
     {
       "title": "Review: heel spur surgery",
       "description": "0 conversions despite RM 46.43 spend. Reduce bid to test at lower position",
-      "impact": "Medium"
+      "impact": "Medium",
+      "action_type": "bid_adjustment",
+      "target_id": "customers/7867388610/adGroupCriteria/156583250615~11654890",
+      "keyword": "heel spur surgery",
+      "suggested_action": ""
     },
     {
       "title": "Review: osteoarthritis treatment",
       "description": "0 conversions despite RM 41.03 spend. Reduce bid to test at lower position",
-      "impact": "Medium"
+      "impact": "Medium",
+      "action_type": "bid_adjustment",
+      "target_id": "customers/7867388610/adGroupCriteria/156583250855~11019091",
+      "keyword": "osteoarthritis treatment",
+      "suggested_action": ""
+    },
+    {
+      "title": "Add Negative Keywords: frozen shoulder",
+      "description": "Zero conversions from 'frozen shoulder', wasted RM 67.73",
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "Frozen Shoulder",
+      "keyword": "frozen shoulder",
+      "suggested_action": "Add 'frozen shoulder' as negative keyword (PHRASE match)"
+    },
+    {
+      "title": "Add Negative Keywords: plantar fasciitis",
+      "description": "Zero conversions from 'plantar fasciitis', wasted RM 66.94",
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "Plantar Faciitis",
+      "keyword": "plantar fasciitis",
+      "suggested_action": "Add 'plantar fasciitis' as negative keyword (PHRASE match)"
+    },
+    {
+      "title": "Add Negative Keywords: plantar fasciitis treatment",
+      "description": "Zero conversions from 'plantar fasciitis treatment', wasted RM 55.03",
+      "impact": "High",
+      "action_type": "keyword_action",
+      "target_id": "Plantar Faciitis",
+      "keyword": "plantar fasciitis treatment",
+      "suggested_action": "Add 'plantar fasciitis treatment' as negative keyword (PHRASE match)"
     }
   ]
 }

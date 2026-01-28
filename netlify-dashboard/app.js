@@ -35,6 +35,7 @@ const elements = {
     // Table elements
     campaignTableBody: document.getElementById('campaignTableBody'),
     keywordTableBody: document.getElementById('keywordTableBody'),
+    searchQueryTableBody: document.getElementById('searchQueryTableBody'),
     insightsGrid: document.getElementById('insightsGrid'),
     recommendationsList: document.getElementById('recommendationsList')
 };
@@ -160,6 +161,26 @@ function renderKeywordTable(keywords) {
     `).join('');
 }
 
+function renderSearchQueries(searchQueries) {
+    if (!elements.searchQueryTableBody) return;
+
+    if (!searchQueries || searchQueries.length === 0) {
+        elements.searchQueryTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No search query data available</td></tr>';
+        return;
+    }
+
+    elements.searchQueryTableBody.innerHTML = searchQueries.map(sq => `
+        <tr>
+            <td><strong>${escapeHtml(sq.query || 'Unknown')}</strong></td>
+            <td>${escapeHtml(sq.campaign || '-')}</td>
+            <td>${formatNumber(sq.impressions || 0)}</td>
+            <td>${formatNumber(sq.clicks || 0)}</td>
+            <td>${formatCurrency(sq.cost || 0)}</td>
+            <td>${formatNumber(sq.conversions || 0)}</td>
+        </tr>
+    `).join('');
+}
+
 function renderInsights(insights) {
     if (!insights || insights.length === 0) {
         elements.insightsGrid.innerHTML = '<div class="insight-card"><p style="color: var(--text-muted);">No insights available</p></div>';
@@ -176,7 +197,7 @@ function renderInsights(insights) {
         'neutral': 'info'
     };
 
-    elements.insightsGrid.innerHTML = insights.slice(0, 4).map(insight => {
+    elements.insightsGrid.innerHTML = insights.slice(0, 6).map(insight => {
         const type = typeMap[insight.type?.toLowerCase()] || 'info';
         return `
             <div class="insight-card">
@@ -200,16 +221,18 @@ function renderRecommendations(recommendations) {
         'low': 'low'
     };
 
-    elements.recommendationsList.innerHTML = recommendations.slice(0, 5).map(rec => {
+    elements.recommendationsList.innerHTML = recommendations.slice(0, 8).map((rec, index) => {
         const impact = impactMap[rec.impact?.toLowerCase()] || 'medium';
+        const hasAction = rec.action_type === 'keyword_action' && rec.keyword;
         return `
             <div class="recommendation-item">
                 <div class="recommendation-content">
                     <h4>${escapeHtml(rec.title || rec.recommendation || 'Recommendation')}</h4>
                     <p>${escapeHtml(rec.description || rec.details || '')}</p>
                 </div>
-                <div class="recommendation-impact">
+                <div class="recommendation-actions">
                     <span class="impact-badge ${impact}">${rec.impact || 'Medium'} Impact</span>
+                    ${hasAction ? `<button class="action-btn" onclick="applyRecommendation(${index})" title="This will pause the keyword in Google Ads">Apply</button>` : ''}
                 </div>
             </div>
         `;
@@ -244,10 +267,14 @@ async function loadData() {
             elements.dateRange.textContent = `${data.date_range.start} to ${data.date_range.end}`;
         }
 
+        // Store data globally for recommendations
+        window.dashboardData = data;
+
         // Render all sections
         renderKPIs(data);
         renderCampaignTable(data.campaigns || []);
         renderKeywordTable(data.keywords || []);
+        renderSearchQueries(data.search_queries || []);
         renderInsights(data.insights || []);
         renderRecommendations(data.recommendations || []);
 
@@ -307,6 +334,50 @@ document.querySelectorAll('.nav-item[href^="#"]').forEach(link => {
         this.classList.add('active');
     });
 });
+
+// Apply Recommendation Function
+async function applyRecommendation(index) {
+    const rec = window.dashboardData?.recommendations?.[index];
+    if (!rec) {
+        alert('Recommendation not found');
+        return;
+    }
+
+    const confirmed = confirm(
+        `Are you sure you want to apply this recommendation?\n\n` +
+        `Action: ${rec.title}\n` +
+        `This will ${rec.suggested_action || 'modify'} the keyword "${rec.keyword}" in Google Ads.\n\n` +
+        `Note: This action requires the Netlify function to have Google Ads API access configured.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch('/.netlify/functions/apply-recommendation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action_type: rec.action_type,
+                target_id: rec.target_id,
+                keyword: rec.keyword,
+                suggested_action: rec.suggested_action
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to apply recommendation');
+        }
+
+        alert('Recommendation applied successfully! The change will be reflected in Google Ads shortly.');
+        // Reload data to show updated status
+        await loadData();
+
+    } catch (error) {
+        console.error('Error applying recommendation:', error);
+        alert(`Failed to apply recommendation: ${error.message}\n\nNote: Make sure the Google Ads API credentials are configured in Netlify environment variables.`);
+    }
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', loadData);
