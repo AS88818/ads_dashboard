@@ -1,7 +1,7 @@
 {
   "customer_id": "7867388610",
   "account_name": "YCK Chiropractic",
-  "generated_at": "2026-01-29T02:31:13.488631",
+  "generated_at": "2026-01-29T02:46:22.052042",
   "date_range": {
     "start_date": "2024-12-29",
     "end_date": "2025-01-28"
@@ -259,6 +259,52 @@
       "impressions": 477,
       "clicks": 42,
       "cost": 30.29,
+      "conversions": 0.0
+    }
+  ],
+  "geo_performance": [
+    {
+      "location_name": "",
+      "country_criterion_id": 2458,
+      "location_type": "LOCATION_OF_PRESENCE",
+      "campaign_name": "YCK Main Search #3",
+      "impressions": 179274,
+      "clicks": 6524,
+      "ctr": 0.036391222374689024,
+      "cost": 4520.05,
+      "conversions": 0.0
+    },
+    {
+      "location_name": "",
+      "country_criterion_id": 2458,
+      "location_type": "AREA_OF_INTEREST",
+      "campaign_name": "YCK Main Search #3",
+      "impressions": 52368,
+      "clicks": 3809,
+      "ctr": 0.07273525817293003,
+      "cost": 2307.57,
+      "conversions": 1.0
+    },
+    {
+      "location_name": "",
+      "country_criterion_id": 2458,
+      "location_type": "AREA_OF_INTEREST",
+      "campaign_name": "YCK Main Search Malay",
+      "impressions": 70,
+      "clicks": 6,
+      "ctr": 0.08571428571428572,
+      "cost": 1.63,
+      "conversions": 0.0
+    },
+    {
+      "location_name": "",
+      "country_criterion_id": 2458,
+      "location_type": "LOCATION_OF_PRESENCE",
+      "campaign_name": "YCK Main Search Malay",
+      "impressions": 206,
+      "clicks": 2,
+      "ctr": 0.009708737864077669,
+      "cost": 1.51,
       "conversions": 0.0
     }
   ],

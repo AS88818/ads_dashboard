@@ -56,6 +56,14 @@
                     </svg>
                     <span>Search Queries</span>
                 </a>
+                <a href="#geo-performance" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M2 12h20"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span>Geographic</span>
+                </a>
                 <a href="#recommendations" class="nav-item">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2v4"/>
@@ -92,7 +100,16 @@
                     <p class="subtitle" id="accountName">Loading account...</p>
                 </div>
                 <div class="header-right">
-                    <div class="date-range" id="dateRange">Last 30 days</div>
+                    <div class="date-selector">
+                        <select id="dateRangeSelect" onchange="changeDateRange(this.value)">
+                            <option value="7">Last 7 days</option>
+                            <option value="14">Last 14 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="custom">Custom range</option>
+                        </select>
+                    </div>
+                    <div class="date-range" id="dateRange">Loading...</div>
                 </div>
             </header>
 
@@ -220,6 +237,31 @@
                                 </tr>
                             </thead>
                             <tbody id="searchQueryTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Geographic Performance Section -->
+                <section class="table-section" id="geo-performance">
+                    <div class="section-header">
+                        <h2>Geographic Performance</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Campaign</th>
+                                    <th>Impressions</th>
+                                    <th>Clicks</th>
+                                    <th>CTR</th>
+                                    <th>Cost</th>
+                                    <th>Conversions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="geoTableBody">
                                 <!-- Populated by JavaScript -->
                             </tbody>
                         </table>

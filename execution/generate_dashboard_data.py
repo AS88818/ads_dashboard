@@ -111,6 +111,20 @@ def generate_dashboard_data(metrics_file, recs_file, output_file):
             }
             for sq in sorted(search_queries, key=lambda x: x.get('clicks', 0), reverse=True)[:10]
         ],
+        'geo_performance': [
+            {
+                'location_name': geo.get('location_name', ''),
+                'country_criterion_id': geo.get('country_criterion_id'),
+                'location_type': geo.get('location_type', ''),
+                'campaign_name': geo.get('campaign_name', ''),
+                'impressions': geo.get('impressions', 0),
+                'clicks': geo.get('clicks', 0),
+                'ctr': geo.get('ctr', 0),
+                'cost': round(geo.get('cost', 0), 2),
+                'conversions': geo.get('conversions', 0)
+            }
+            for geo in sorted(metrics.get('geo_performance', []), key=lambda x: x.get('clicks', 0), reverse=True)[:10]
+        ],
         'insights': [],
         'recommendations': []
     }

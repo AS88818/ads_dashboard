@@ -36,6 +36,7 @@ const elements = {
     campaignTableBody: document.getElementById('campaignTableBody'),
     keywordTableBody: document.getElementById('keywordTableBody'),
     searchQueryTableBody: document.getElementById('searchQueryTableBody'),
+    geoTableBody: document.getElementById('geoTableBody'),
     insightsGrid: document.getElementById('insightsGrid'),
     recommendationsList: document.getElementById('recommendationsList')
 };
@@ -181,6 +182,44 @@ function renderSearchQueries(searchQueries) {
     `).join('');
 }
 
+// Location ID to name mapping (Google Ads Geo Criterion IDs)
+const locationNames = {
+    2458: 'Malaysia',
+    2360: 'Vietnam',
+    2702: 'Singapore',
+    2764: 'Thailand',
+    2360: 'Indonesia',
+    2156: 'China',
+    2356: 'India'
+};
+
+function renderGeoPerformance(geoData) {
+    if (!elements.geoTableBody) return;
+
+    if (!geoData || geoData.length === 0) {
+        elements.geoTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No geographic data available</td></tr>';
+        return;
+    }
+
+    // Group by location and sort by clicks
+    const topGeo = geoData.slice(0, 10);
+
+    elements.geoTableBody.innerHTML = topGeo.map(geo => {
+        const locationName = geo.location_name || locationNames[geo.country_criterion_id] || `Region ${geo.country_criterion_id || 'Unknown'}`;
+        const locationType = geo.location_type === 'AREA_OF_INTEREST' ? '(Interest)' : '(Presence)';
+        return `
+        <tr>
+            <td><strong>${escapeHtml(locationName)}</strong> <small style="color: var(--text-muted)">${locationType}</small></td>
+            <td>${escapeHtml(geo.campaign_name || geo.campaign || '-')}</td>
+            <td>${formatNumber(geo.impressions || 0)}</td>
+            <td>${formatNumber(geo.clicks || 0)}</td>
+            <td>${formatPercent((geo.ctr || 0) * 100)}</td>
+            <td>${formatCurrency(geo.cost || 0)}</td>
+            <td>${formatNumber(geo.conversions || 0)}</td>
+        </tr>
+    `}).join('');
+}
+
 function renderInsights(insights) {
     if (!insights || insights.length === 0) {
         elements.insightsGrid.innerHTML = '<div class="insight-card"><p style="color: var(--text-muted);">No insights available</p></div>';
@@ -268,7 +307,9 @@ async function loadData() {
         elements.accountName.textContent = data.account_name || `Customer ID: ${data.customer_id || 'Unknown'}`;
 
         if (data.date_range) {
-            elements.dateRange.textContent = `${data.date_range.start} to ${data.date_range.end}`;
+            const start = data.date_range.start_date || data.date_range.start || 'N/A';
+            const end = data.date_range.end_date || data.date_range.end || 'N/A';
+            elements.dateRange.textContent = `${start} to ${end}`;
         }
 
         // Store data globally for recommendations
@@ -279,6 +320,7 @@ async function loadData() {
         renderCampaignTable(data.campaigns || []);
         renderKeywordTable(data.keywords || []);
         renderSearchQueries(data.search_queries || []);
+        renderGeoPerformance(data.geo_performance || []);
         renderInsights(data.insights || []);
         renderRecommendations(data.recommendations || []);
 
@@ -338,6 +380,55 @@ document.querySelectorAll('.nav-item[href^="#"]').forEach(link => {
         this.classList.add('active');
     });
 });
+
+// Change Date Range Function
+async function changeDateRange(days) {
+    if (days === 'custom') {
+        alert('Custom date range requires the refresh-data function to be updated.\n\nFor now, please use the predefined ranges.');
+        document.getElementById('dateRangeSelect').value = '30';
+        return;
+    }
+
+    const daysNum = parseInt(days, 10);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - daysNum);
+
+    const formatDateStr = (d) => d.toISOString().split('T')[0];
+
+    // Show loading state
+    const btn = elements.refreshBtn;
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        const response = await fetch(CONFIG.refreshEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_date: formatDateStr(startDate),
+                end_date: formatDateStr(endDate),
+                days: daysNum
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Refresh failed: ${response.status}`);
+        }
+
+        // Reload data after refresh
+        await loadData();
+        alert(`Data refreshed for last ${daysNum} days`);
+
+    } catch (error) {
+        console.error('Error changing date range:', error);
+        alert(`Failed to refresh data: ${error.message}\n\nNote: The refresh function needs Google Ads API credentials configured in Netlify.`);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
 
 // Apply Recommendation Function
 async function applyRecommendation(index) {
