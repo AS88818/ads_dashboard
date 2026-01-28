@@ -368,17 +368,99 @@ def fetch_search_query_report(client, customer_id, start_date, end_date):
 
 
 def fetch_geographic_metrics(client, customer_id, start_date, end_date):
-    """Fetch geographic performance report with city-level detail using user_location_view."""
+    """Fetch geographic performance report with targeted location detail."""
     ga_service = client.get_service("GoogleAdsService")
     geo_target_service = client.get_service("GeoTargetConstantService")
 
-    # Use user_location_view for more detailed location data (cities, regions)
+    # First, get campaign location targets (including proximity/radius targeting)
+    location_targets_query = f"""
+        SELECT
+            campaign.id,
+            campaign.name,
+            campaign_criterion.criterion_id,
+            campaign_criterion.location.geo_target_constant,
+            campaign_criterion.proximity.address.city_name,
+            campaign_criterion.proximity.address.province_name,
+            campaign_criterion.proximity.address.street_address,
+            campaign_criterion.proximity.radius,
+            campaign_criterion.proximity.radius_units,
+            campaign_criterion.proximity.geo_point.latitude_in_micro_degrees,
+            campaign_criterion.proximity.geo_point.longitude_in_micro_degrees,
+            campaign_criterion.negative
+        FROM campaign_criterion
+        WHERE campaign_criterion.type IN ('LOCATION', 'PROXIMITY')
+    """
+
+    location_names = {}  # criterion_id -> location name
+
+    try:
+        response = ga_service.search_stream(customer_id=customer_id, query=location_targets_query)
+        for batch in response:
+            for row in batch.results:
+                criterion_id = row.campaign_criterion.criterion_id
+                campaign_id = row.campaign.id
+
+                # Check for proximity (radius) targeting
+                if hasattr(row.campaign_criterion, 'proximity') and row.campaign_criterion.proximity:
+                    prox = row.campaign_criterion.proximity
+                    # street_address often contains the location name (e.g., "Ampang, Selangor")
+                    street = prox.address.street_address if hasattr(prox.address, 'street_address') else ''
+                    city = prox.address.city_name if hasattr(prox.address, 'city_name') else ''
+                    province = prox.address.province_name if hasattr(prox.address, 'province_name') else ''
+                    radius = prox.radius if hasattr(prox, 'radius') else 0
+
+                    # Build location name from available fields
+                    location_desc = street or city or province or 'Unknown'
+                    location_name = f"{radius} km around {location_desc}"
+                    location_names[(campaign_id, criterion_id)] = location_name
+
+                # Check for location (geo target) targeting - we'll resolve names later
+                elif hasattr(row.campaign_criterion, 'location') and row.campaign_criterion.location.geo_target_constant:
+                    geo_resource = row.campaign_criterion.location.geo_target_constant
+                    geo_id = geo_resource.split('/')[-1] if '/' in geo_resource else geo_resource
+                    # Store geo_id to resolve later
+                    location_names[(campaign_id, criterion_id)] = ('geo_id', geo_id)
+
+    except GoogleAdsException as ex:
+        print(f"  Warning: Could not fetch location targets: {ex.error.code().name}")
+
+    # Resolve geo_target_constant IDs to names
+    geo_ids_to_resolve = set()
+    for key, val in location_names.items():
+        if isinstance(val, tuple) and val[0] == 'geo_id':
+            geo_ids_to_resolve.add(val[1])
+
+    if geo_ids_to_resolve:
+        geo_id_names = {}
+        try:
+            id_list = ','.join(geo_ids_to_resolve)
+            geo_query = f'''
+                SELECT
+                    geo_target_constant.id,
+                    geo_target_constant.name,
+                    geo_target_constant.canonical_name
+                FROM geo_target_constant
+                WHERE geo_target_constant.id IN ({id_list})
+            '''
+            response = ga_service.search_stream(customer_id=customer_id, query=geo_query)
+            for batch in response:
+                for row in batch.results:
+                    geo_id_names[str(row.geo_target_constant.id)] = row.geo_target_constant.canonical_name or row.geo_target_constant.name
+        except Exception as e:
+            print(f"  Warning: Could not resolve geo target names: {e}")
+
+        # Update location_names with resolved names
+        for key, val in list(location_names.items()):
+            if isinstance(val, tuple) and val[0] == 'geo_id':
+                geo_id = val[1]
+                location_names[key] = geo_id_names.get(geo_id, f"Location {geo_id}")
+
+    # Now get location performance metrics
     query = f"""
         SELECT
             campaign.id,
             campaign.name,
-            user_location_view.country_criterion_id,
-            user_location_view.targeting_location,
+            location_view.resource_name,
             metrics.impressions,
             metrics.clicks,
             metrics.ctr,
@@ -386,7 +468,7 @@ def fetch_geographic_metrics(client, customer_id, start_date, end_date):
             metrics.cost_micros,
             metrics.conversions,
             metrics.conversions_value
-        FROM user_location_view
+        FROM location_view
         WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
             AND metrics.impressions > 0
         ORDER BY metrics.clicks DESC
@@ -394,43 +476,29 @@ def fetch_geographic_metrics(client, customer_id, start_date, end_date):
     """
 
     geo_data = []
-    location_cache = {}  # Cache for location names
 
     try:
         response = ga_service.search_stream(customer_id=customer_id, query=query)
 
         for batch in response:
             for row in batch.results:
-                # Get the targeting location resource name (contains city/region info)
-                targeting_location = None
-                location_name = None
+                campaign_id = row.campaign.id
+                campaign_name = row.campaign.name
 
-                if hasattr(row.user_location_view, 'targeting_location'):
-                    tl = row.user_location_view.targeting_location
-                    # targeting_location is a resource name string like "geoTargetConstants/12345"
-                    if tl and isinstance(tl, str) and '/' in tl:
-                        targeting_location = tl
-                        location_id = targeting_location.split('/')[-1]
-                        # Try to get location name from cache or API
-                        if location_id in location_cache:
-                            location_name = location_cache[location_id]
-                        else:
-                            try:
-                                # Fetch the geo target constant to get the location name
-                                geo_target = geo_target_service.get_geo_target_constant(
-                                    resource_name=targeting_location
-                                )
-                                location_name = geo_target.name
-                                location_cache[location_id] = location_name
-                            except Exception:
-                                location_name = f"Location {location_id}"
-                                location_cache[location_id] = location_name
+                # Extract criterion_id from location_view resource_name
+                # Format: customers/{customer_id}/locationViews/{campaign_id}~{criterion_id}
+                criterion_id = None
+                resource_name = row.location_view.resource_name
+                if '~' in resource_name:
+                    criterion_id = int(resource_name.split('~')[-1])
+
+                # Look up location name from our pre-fetched location targets
+                location_name = location_names.get((campaign_id, criterion_id), f"Location {criterion_id}")
 
                 location_data = {
-                    "campaign_id": row.campaign.id,
-                    "campaign_name": row.campaign.name,
-                    "country_criterion_id": row.user_location_view.country_criterion_id if hasattr(row.user_location_view, 'country_criterion_id') else None,
-                    "targeting_location": targeting_location,
+                    "campaign_id": campaign_id,
+                    "campaign_name": campaign_name,
+                    "criterion_id": criterion_id,
                     "location_name": location_name,
                     "impressions": row.metrics.impressions,
                     "clicks": row.metrics.clicks,
@@ -444,8 +512,10 @@ def fetch_geographic_metrics(client, customer_id, start_date, end_date):
                 geo_data.append(location_data)
 
     except GoogleAdsException as ex:
-        print(f"Geographic request failed with status {ex.error.code().name}")
-        # Fall back to geographic_view if user_location_view fails
+        print(f"Location view request failed: {ex.error.code().name}")
+        for error in ex.failure.errors:
+            print(f"  Error: {error.message}")
+        # Fall back to geographic_view if location_view fails
         return fetch_geographic_metrics_fallback(client, customer_id, start_date, end_date)
 
     return geo_data
