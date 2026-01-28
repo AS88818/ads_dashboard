@@ -2,7 +2,5 @@
   "name": "ads-dashboard",
   "version": "1.0.0",
   "description": "Google Ads Insights Dashboard for Netlify",
-  "dependencies": {
-    "google-ads-api": "^14.2.0"
-  }
+  "dependencies": {}
 }

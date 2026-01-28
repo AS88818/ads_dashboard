@@ -1,8 +1,10 @@
 /**
  * Netlify Function: Refresh Google Ads Data
  *
- * This serverless function fetches data from Google Ads API
+ * This serverless function fetches data from Google Ads REST API
  * and generates insights for the dashboard.
+ *
+ * Uses REST API instead of gRPC to avoid serverless compatibility issues.
  *
  * Environment variables required:
  * - GOOGLE_ADS_DEVELOPER_TOKEN
@@ -12,8 +14,6 @@
  * - GOOGLE_ADS_LOGIN_CUSTOMER_ID
  * - GOOGLE_ADS_CUSTOMER_ID (e.g., 7867388610 for YCK)
  */
-
-const { GoogleAdsApi } = require('google-ads-api');
 
 // Helper functions
 function formatDate(date) {
@@ -30,17 +30,93 @@ function getDateRange(days = 30) {
     };
 }
 
-function calculateTrends(current, previous) {
-    if (!previous || previous === 0) return 0;
-    return ((current - previous) / previous) * 100;
+// Get OAuth2 access token using refresh token
+async function getAccessToken() {
+    const tokenUrl = 'https://oauth2.googleapis.com/token';
+
+    const params = new URLSearchParams({
+        client_id: process.env.GOOGLE_ADS_CLIENT_ID,
+        client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET,
+        refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+        grant_type: 'refresh_token'
+    });
+
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to get access token: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+}
+
+// Execute Google Ads GAQL query via REST API
+async function executeGaqlQuery(accessToken, customerId, query) {
+    const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+
+    // Google Ads REST API v18 endpoint
+    const url = `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'developer-token': developerToken,
+            'login-customer-id': loginCustomerId,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Google Ads API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    // searchStream returns an array of result batches
+    const results = [];
+    if (Array.isArray(data)) {
+        for (const batch of data) {
+            if (batch.results) {
+                results.push(...batch.results);
+            }
+        }
+    }
+
+    return results;
 }
 
 // Main handler
 exports.handler = async (event, context) => {
+    // CORS headers
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Content-Type': 'application/json'
+    };
+
+    // Handle preflight
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
+            headers,
             body: JSON.stringify({ error: 'Method not allowed' })
         };
     }
@@ -59,6 +135,7 @@ exports.handler = async (event, context) => {
     if (missingVars.length > 0) {
         return {
             statusCode: 500,
+            headers,
             body: JSON.stringify({
                 error: 'Missing required environment variables',
                 missing: missingVars
@@ -67,22 +144,17 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        // Initialize Google Ads client
-        const client = new GoogleAdsApi({
-            client_id: process.env.GOOGLE_ADS_CLIENT_ID,
-            client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET,
-            developer_token: process.env.GOOGLE_ADS_DEVELOPER_TOKEN
-        });
+        const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID;
 
-        const customer = client.Customer({
-            customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
-            login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-            refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN
-        });
+        // Get fresh access token
+        console.log('Getting access token...');
+        const accessToken = await getAccessToken();
+        console.log('Access token obtained');
 
         const dateRange = getDateRange(30);
 
         // Fetch campaign data
+        console.log('Fetching campaign data...');
         const campaignQuery = `
             SELECT
                 campaign.id,
@@ -100,9 +172,11 @@ exports.handler = async (event, context) => {
             LIMIT 20
         `;
 
-        const campaignResults = await customer.query(campaignQuery);
+        const campaignResults = await executeGaqlQuery(accessToken, customerId, campaignQuery);
+        console.log(`Fetched ${campaignResults.length} campaigns`);
 
         // Fetch keyword data
+        console.log('Fetching keyword data...');
         const keywordQuery = `
             SELECT
                 ad_group_criterion.keyword.text,
@@ -119,31 +193,112 @@ exports.handler = async (event, context) => {
             LIMIT 20
         `;
 
-        const keywordResults = await customer.query(keywordQuery);
+        const keywordResults = await executeGaqlQuery(accessToken, customerId, keywordQuery);
+        console.log(`Fetched ${keywordResults.length} keywords`);
+
+        // Fetch search queries
+        console.log('Fetching search queries...');
+        const searchQuerySQL = `
+            SELECT
+                search_term_view.search_term,
+                campaign.name,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.cost_micros,
+                metrics.conversions
+            FROM search_term_view
+            WHERE segments.date BETWEEN '${dateRange.start}' AND '${dateRange.end}'
+            ORDER BY metrics.clicks DESC
+            LIMIT 15
+        `;
+
+        let searchQueryResults = [];
+        try {
+            searchQueryResults = await executeGaqlQuery(accessToken, customerId, searchQuerySQL);
+            console.log(`Fetched ${searchQueryResults.length} search queries`);
+        } catch (err) {
+            console.log('Could not fetch search queries:', err.message);
+        }
+
+        // Fetch geographic data
+        console.log('Fetching geographic data...');
+        const geoQuery = `
+            SELECT
+                geographic_view.country_criterion_id,
+                geographic_view.location_type,
+                campaign.name,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.ctr,
+                metrics.cost_micros,
+                metrics.conversions
+            FROM geographic_view
+            WHERE segments.date BETWEEN '${dateRange.start}' AND '${dateRange.end}'
+            ORDER BY metrics.clicks DESC
+            LIMIT 15
+        `;
+
+        let geoResults = [];
+        try {
+            geoResults = await executeGaqlQuery(accessToken, customerId, geoQuery);
+            console.log(`Fetched ${geoResults.length} geo records`);
+        } catch (err) {
+            console.log('Could not fetch geographic data:', err.message);
+        }
 
         // Process campaign data
         const campaigns = campaignResults.map(row => ({
-            name: row.campaign.name,
-            status: row.campaign.status,
-            spend: (row.metrics.cost_micros || 0) / 1000000,
-            impressions: row.metrics.impressions || 0,
-            clicks: row.metrics.clicks || 0,
-            ctr: (row.metrics.ctr || 0) * 100,
-            conversions: row.metrics.conversions || 0,
-            cpa: row.metrics.conversions > 0
-                ? (row.metrics.cost_micros / 1000000) / row.metrics.conversions
+            id: row.campaign?.id || null,
+            name: row.campaign?.name || 'Unknown',
+            status: row.campaign?.status || 'UNKNOWN',
+            spend: (row.metrics?.costMicros || 0) / 1000000,
+            impressions: parseInt(row.metrics?.impressions || 0),
+            clicks: parseInt(row.metrics?.clicks || 0),
+            ctr: parseFloat(row.metrics?.ctr || 0) * 100,
+            conversions: parseFloat(row.metrics?.conversions || 0),
+            cpa: row.metrics?.conversions > 0
+                ? (row.metrics?.costMicros / 1000000) / row.metrics.conversions
                 : 0
         }));
 
+        // Create campaign ID map for later use
+        const campaignIdMap = {};
+        campaigns.forEach(c => {
+            campaignIdMap[c.name] = c.id;
+        });
+
         // Process keyword data
         const keywords = keywordResults.map(row => ({
-            keyword: row.ad_group_criterion?.keyword?.text || 'Unknown',
+            keyword: row.adGroupCriterion?.keyword?.text || 'Unknown',
             campaign: row.campaign?.name || '-',
-            impressions: row.metrics.impressions || 0,
-            clicks: row.metrics.clicks || 0,
-            ctr: (row.metrics.ctr || 0) * 100,
-            avg_cpc: (row.metrics.average_cpc || 0) / 1000000,
-            quality_score: row.ad_group_criterion?.quality_info?.quality_score || null
+            impressions: parseInt(row.metrics?.impressions || 0),
+            clicks: parseInt(row.metrics?.clicks || 0),
+            ctr: parseFloat(row.metrics?.ctr || 0) * 100,
+            avg_cpc: (row.metrics?.averageCpc || 0) / 1000000,
+            quality_score: row.adGroupCriterion?.qualityInfo?.qualityScore || null
+        }));
+
+        // Process search queries
+        const searchQueries = searchQueryResults.map(row => ({
+            query: row.searchTermView?.searchTerm || '',
+            campaign: row.campaign?.name || '',
+            impressions: parseInt(row.metrics?.impressions || 0),
+            clicks: parseInt(row.metrics?.clicks || 0),
+            cost: (row.metrics?.costMicros || 0) / 1000000,
+            conversions: parseFloat(row.metrics?.conversions || 0)
+        }));
+
+        // Process geographic data
+        const geoPerformance = geoResults.map(row => ({
+            location_name: `Location ${row.geographicView?.countryCriterionId || 'Unknown'}`,
+            country_criterion_id: row.geographicView?.countryCriterionId || null,
+            location_type: row.geographicView?.locationType || '',
+            campaign_name: row.campaign?.name || '',
+            impressions: parseInt(row.metrics?.impressions || 0),
+            clicks: parseInt(row.metrics?.clicks || 0),
+            ctr: parseFloat(row.metrics?.ctr || 0),
+            cost: (row.metrics?.costMicros || 0) / 1000000,
+            conversions: parseFloat(row.metrics?.conversions || 0)
         }));
 
         // Calculate summary metrics
@@ -171,33 +326,35 @@ exports.handler = async (event, context) => {
         }
 
         // Generate AI-style insights
-        const insights = generateInsights(summary, campaigns, keywords);
-        const recommendations = generateRecommendations(summary, campaigns, keywords);
+        const insights = generateInsights(summary, campaigns, keywords, searchQueries);
+        const recommendations = generateRecommendations(summary, campaigns, keywords, searchQueries, campaignIdMap);
 
         // Build final response
         const data = {
-            customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
+            customer_id: customerId,
             account_name: 'YCK Chiropractic',
             generated_at: new Date().toISOString(),
             date_range: dateRange,
             summary,
             trends: {
-                spend_change: 0, // Would need historical data to calculate
+                spend_change: 0,
                 conversions_change: 0,
                 cpa_change: 0,
                 quality_score_change: 0
             },
             campaigns,
             keywords,
+            search_queries: searchQueries,
+            geo_performance: geoPerformance,
             insights,
             recommendations
         };
 
+        console.log('Data refresh complete');
+
         return {
             statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers,
             body: JSON.stringify(data)
         };
 
@@ -206,6 +363,7 @@ exports.handler = async (event, context) => {
 
         return {
             statusCode: 500,
+            headers,
             body: JSON.stringify({
                 error: 'Failed to fetch Google Ads data',
                 message: error.message
@@ -215,8 +373,29 @@ exports.handler = async (event, context) => {
 };
 
 // Generate insights based on data
-function generateInsights(summary, campaigns, keywords) {
+function generateInsights(summary, campaigns, keywords, searchQueries) {
     const insights = [];
+
+    // Low quality keywords
+    const lowQualityKeywords = keywords.filter(k => k.quality_score && k.quality_score < 5);
+    if (lowQualityKeywords.length > 0) {
+        insights.push({
+            type: 'warning',
+            title: 'Low Quality Scores',
+            description: `${lowQualityKeywords.length} keywords have quality scores below 5. Improving ad relevance and landing pages could reduce CPC by 20-30%.`
+        });
+    }
+
+    // Wasted spend on search queries
+    const wastedQueries = searchQueries.filter(sq => sq.conversions === 0 && sq.cost > 10);
+    const totalWasted = wastedQueries.reduce((sum, sq) => sum + sq.cost, 0);
+    if (wastedQueries.length > 0) {
+        insights.push({
+            type: 'alert',
+            title: 'Wasted Ad Spend',
+            description: `RM ${totalWasted.toFixed(2)} spent on ${wastedQueries.length} search queries with zero conversions. Consider adding negative keywords.`
+        });
+    }
 
     // High-performing keywords
     const topKeyword = keywords.find(k => k.quality_score >= 8 && k.ctr >= 3);
@@ -225,16 +404,6 @@ function generateInsights(summary, campaigns, keywords) {
             type: 'opportunity',
             title: 'High-Performing Keyword',
             description: `'${topKeyword.keyword}' has a ${topKeyword.ctr.toFixed(1)}% CTR and quality score of ${topKeyword.quality_score}. Consider increasing bids to capture more impression share.`
-        });
-    }
-
-    // Budget pacing
-    const topCampaign = campaigns[0];
-    if (topCampaign && topCampaign.status === 'ENABLED') {
-        insights.push({
-            type: 'info',
-            title: 'Top Campaign Performance',
-            description: `'${topCampaign.name}' is your highest spending campaign with ${topCampaign.conversions} conversions at MYR ${topCampaign.cpa.toFixed(2)} CPA.`
         });
     }
 
@@ -248,22 +417,51 @@ function generateInsights(summary, campaigns, keywords) {
         });
     }
 
-    // Low quality keywords
-    const lowQualityKeywords = keywords.filter(k => k.quality_score && k.quality_score < 5);
-    if (lowQualityKeywords.length > 0) {
+    // Campaign status
+    const pausedCampaigns = campaigns.filter(c => c.status === 'PAUSED');
+    if (pausedCampaigns.length > 0) {
         insights.push({
-            type: 'warning',
-            title: 'Low Quality Score Keywords',
-            description: `${lowQualityKeywords.length} keywords have quality scores below 5, which increases your cost per click. Review ad relevance and landing pages.`
+            type: 'info',
+            title: 'Campaign Status',
+            description: `${pausedCampaigns.length} campaign(s) are currently PAUSED. Total historical spend: RM ${summary.total_spend.toFixed(2)}.`
         });
     }
 
-    return insights.slice(0, 4);
+    // CPA alert
+    if (summary.total_conversions > 0 && summary.cost_per_conversion > 100) {
+        insights.push({
+            type: 'alert',
+            title: 'High CPA Alert',
+            description: `Cost per conversion is RM ${summary.cost_per_conversion.toFixed(2)}. Review conversion tracking and keyword targeting.`
+        });
+    } else if (summary.total_conversions === 0 && summary.total_spend > 0) {
+        insights.push({
+            type: 'alert',
+            title: 'No Conversions',
+            description: 'No conversions recorded. Verify conversion tracking is set up correctly in Google Ads.'
+        });
+    }
+
+    return insights.slice(0, 6);
 }
 
 // Generate recommendations based on data
-function generateRecommendations(summary, campaigns, keywords) {
+function generateRecommendations(summary, campaigns, keywords, searchQueries, campaignIdMap) {
     const recommendations = [];
+
+    // Add negative keywords for wasted spend
+    const wastedQueries = searchQueries.filter(sq => sq.conversions === 0 && sq.cost > 10);
+    for (const sq of wastedQueries.slice(0, 3)) {
+        recommendations.push({
+            title: `Add Negative Keyword: ${sq.query}`,
+            description: `RM ${sq.cost.toFixed(2)} spent with 0 conversions. Add as negative keyword to prevent wasted spend.`,
+            impact: 'High',
+            action_type: 'add_negative_keyword',
+            keyword: sq.query,
+            campaign_id: campaignIdMap[sq.campaign] || null,
+            match_type: 'PHRASE'
+        });
+    }
 
     // Budget increase for top campaign
     const enabledCampaigns = campaigns.filter(c => c.status === 'ENABLED' && c.conversions > 0);
@@ -271,18 +469,23 @@ function generateRecommendations(summary, campaigns, keywords) {
     if (bestCampaign) {
         recommendations.push({
             title: `Increase budget for ${bestCampaign.name}`,
-            description: `This campaign has the lowest CPA (MYR ${bestCampaign.cpa.toFixed(2)}). Increasing budget could generate more conversions efficiently.`,
-            impact: 'High'
+            description: `This campaign has the lowest CPA (RM ${bestCampaign.cpa.toFixed(2)}). Increasing budget could generate more conversions efficiently.`,
+            impact: 'High',
+            action_type: 'bid_adjustment',
+            campaign_id: bestCampaign.id
         });
     }
 
     // Pause low quality keywords
-    const lowQualityKeywords = keywords.filter(k => k.quality_score && k.quality_score < 5);
-    if (lowQualityKeywords.length > 0) {
+    const lowQualityKeywords = keywords.filter(k => k.quality_score && k.quality_score < 4 && k.clicks > 10);
+    for (const kw of lowQualityKeywords.slice(0, 2)) {
         recommendations.push({
-            title: 'Review low quality score keywords',
-            description: `${lowQualityKeywords.length} keywords have quality scores below 5. Consider pausing or improving these to reduce costs.`,
-            impact: 'Medium'
+            title: `Pause Keyword: ${kw.keyword}`,
+            description: `Quality score of ${kw.quality_score}/10 with ${kw.clicks} clicks. Low quality increases CPC.`,
+            impact: 'Medium',
+            action_type: 'keyword_action',
+            keyword: kw.keyword,
+            suggested_action: 'PAUSED'
         });
     }
 
@@ -292,7 +495,8 @@ function generateRecommendations(summary, campaigns, keywords) {
         recommendations.push({
             title: 'Reactivate paused campaigns',
             description: `${pausedCampaigns.length} paused campaign(s) had good engagement metrics. Consider reactivating with updated ad copy.`,
-            impact: 'Medium'
+            impact: 'Medium',
+            action_type: 'review'
         });
     }
 
@@ -302,18 +506,20 @@ function generateRecommendations(summary, campaigns, keywords) {
         recommendations.push({
             title: 'Improve landing page conversion',
             description: `${highCtrLowConv.length} campaign(s) have high CTR but low conversions. Review landing page experience and call-to-action.`,
-            impact: 'High'
+            impact: 'High',
+            action_type: 'review'
         });
     }
 
     // General recommendation if few specific ones
     if (recommendations.length < 3) {
         recommendations.push({
-            title: 'Add negative keywords',
-            description: 'Review search terms report regularly and add irrelevant queries as negative keywords to improve targeting efficiency.',
-            impact: 'Medium'
+            title: 'Review search terms report',
+            description: 'Regularly review search terms and add irrelevant queries as negative keywords to improve targeting efficiency.',
+            impact: 'Medium',
+            action_type: 'review'
         });
     }
 
-    return recommendations.slice(0, 5);
+    return recommendations.slice(0, 8);
 }

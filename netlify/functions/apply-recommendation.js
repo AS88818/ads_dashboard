@@ -4,6 +4,8 @@
  * This serverless function applies recommendations to Google Ads
  * such as pausing keywords, adding negative keywords, or adjusting bids.
  *
+ * Uses REST API instead of gRPC to avoid serverless compatibility issues.
+ *
  * Environment variables required:
  * - GOOGLE_ADS_DEVELOPER_TOKEN
  * - GOOGLE_ADS_CLIENT_ID
@@ -13,23 +15,32 @@
  * - GOOGLE_ADS_CUSTOMER_ID
  */
 
-const { GoogleAdsApi, enums } = require('google-ads-api');
+// Get OAuth2 access token using refresh token
+async function getAccessToken() {
+    const tokenUrl = 'https://oauth2.googleapis.com/token';
 
-// Initialize Google Ads client
-function getGoogleAdsClient() {
-    return new GoogleAdsApi({
+    const params = new URLSearchParams({
         client_id: process.env.GOOGLE_ADS_CLIENT_ID,
         client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET,
-        developer_token: process.env.GOOGLE_ADS_DEVELOPER_TOKEN
+        refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+        grant_type: 'refresh_token'
     });
-}
 
-function getCustomer(client) {
-    return client.Customer({
-        customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID,
-        login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-        refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN
+    const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
     });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to get access token: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
 }
 
 // Parse the target_id to extract ad group and criterion IDs
@@ -45,75 +56,89 @@ function parseTargetId(targetId) {
     return null;
 }
 
+// Execute a mutate operation via REST API
+async function executeMutate(accessToken, customerId, resourceType, operations) {
+    const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+
+    // Google Ads REST API v18 endpoint
+    const url = `https://googleads.googleapis.com/v18/customers/${customerId}/${resourceType}:mutate`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'developer-token': developerToken,
+            'login-customer-id': loginCustomerId,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ operations })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Google Ads API error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+}
+
 // Pause a keyword
-async function pauseKeyword(customer, targetId) {
+async function pauseKeyword(accessToken, customerId, targetId) {
     const parsed = parseTargetId(targetId);
     if (!parsed) {
         throw new Error(`Invalid target_id format: ${targetId}`);
     }
 
     const { adGroupId, criterionId } = parsed;
-    const resourceName = `customers/${process.env.GOOGLE_ADS_CUSTOMER_ID}/adGroupCriteria/${adGroupId}~${criterionId}`;
+    const resourceName = `customers/${customerId}/adGroupCriteria/${adGroupId}~${criterionId}`;
 
-    const operation = {
+    const operations = [{
+        updateMask: 'status',
         update: {
-            resource_name: resourceName,
-            status: enums.AdGroupCriterionStatus.PAUSED
-        },
-        update_mask: {
-            paths: ['status']
+            resourceName: resourceName,
+            status: 'PAUSED'
         }
-    };
+    }];
 
-    const response = await customer.adGroupCriteria.update([operation]);
-    return response;
+    return await executeMutate(accessToken, customerId, 'adGroupCriteria', operations);
 }
 
 // Enable a keyword
-async function enableKeyword(customer, targetId) {
+async function enableKeyword(accessToken, customerId, targetId) {
     const parsed = parseTargetId(targetId);
     if (!parsed) {
         throw new Error(`Invalid target_id format: ${targetId}`);
     }
 
     const { adGroupId, criterionId } = parsed;
-    const resourceName = `customers/${process.env.GOOGLE_ADS_CUSTOMER_ID}/adGroupCriteria/${adGroupId}~${criterionId}`;
+    const resourceName = `customers/${customerId}/adGroupCriteria/${adGroupId}~${criterionId}`;
 
-    const operation = {
+    const operations = [{
+        updateMask: 'status',
         update: {
-            resource_name: resourceName,
-            status: enums.AdGroupCriterionStatus.ENABLED
-        },
-        update_mask: {
-            paths: ['status']
+            resourceName: resourceName,
+            status: 'ENABLED'
         }
-    };
+    }];
 
-    const response = await customer.adGroupCriteria.update([operation]);
-    return response;
+    return await executeMutate(accessToken, customerId, 'adGroupCriteria', operations);
 }
 
 // Add a negative keyword to a campaign
-async function addNegativeKeyword(customer, campaignId, keyword, matchType = 'PHRASE') {
-    const matchTypeEnum = {
-        'EXACT': enums.KeywordMatchType.EXACT,
-        'PHRASE': enums.KeywordMatchType.PHRASE,
-        'BROAD': enums.KeywordMatchType.BROAD
-    };
-
-    const operation = {
+async function addNegativeKeyword(accessToken, customerId, campaignId, keyword, matchType = 'PHRASE') {
+    const operations = [{
         create: {
-            campaign: `customers/${process.env.GOOGLE_ADS_CUSTOMER_ID}/campaigns/${campaignId}`,
+            campaign: `customers/${customerId}/campaigns/${campaignId}`,
             keyword: {
                 text: keyword,
-                match_type: matchTypeEnum[matchType] || enums.KeywordMatchType.PHRASE
+                matchType: matchType
             },
             negative: true
         }
-    };
+    }];
 
-    const response = await customer.campaignCriteria.create([operation]);
-    return response;
+    return await executeMutate(accessToken, customerId, 'campaignCriteria', operations);
 }
 
 // Main handler
@@ -176,8 +201,12 @@ exports.handler = async (event, context) => {
             };
         }
 
-        const client = getGoogleAdsClient();
-        const customer = getCustomer(client);
+        const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID;
+
+        // Get fresh access token
+        console.log('Getting access token...');
+        const accessToken = await getAccessToken();
+        console.log('Access token obtained');
 
         let result;
         let message;
@@ -192,7 +221,7 @@ exports.handler = async (event, context) => {
                             body: JSON.stringify({ error: 'Missing target_id for pause action' })
                         };
                     }
-                    result = await pauseKeyword(customer, target_id);
+                    result = await pauseKeyword(accessToken, customerId, target_id);
                     message = `Successfully paused keyword "${keyword}"`;
                 } else if (suggested_action === 'ENABLED') {
                     if (!target_id) {
@@ -202,7 +231,7 @@ exports.handler = async (event, context) => {
                             body: JSON.stringify({ error: 'Missing target_id for enable action' })
                         };
                     }
-                    result = await enableKeyword(customer, target_id);
+                    result = await enableKeyword(accessToken, customerId, target_id);
                     message = `Successfully enabled keyword "${keyword}"`;
                 } else {
                     // Default to pause for keyword actions
@@ -213,7 +242,7 @@ exports.handler = async (event, context) => {
                             body: JSON.stringify({ error: 'Missing target_id for keyword action' })
                         };
                     }
-                    result = await pauseKeyword(customer, target_id);
+                    result = await pauseKeyword(accessToken, customerId, target_id);
                     message = `Successfully paused keyword "${keyword}"`;
                 }
                 break;
@@ -228,7 +257,7 @@ exports.handler = async (event, context) => {
                         })
                     };
                 }
-                result = await addNegativeKeyword(customer, campaign_id, keyword, match_type || 'PHRASE');
+                result = await addNegativeKeyword(accessToken, customerId, campaign_id, keyword, match_type || 'PHRASE');
                 message = `Successfully added "${keyword}" as negative keyword (${match_type || 'PHRASE'} match)`;
                 break;
 
@@ -272,17 +301,13 @@ exports.handler = async (event, context) => {
 
         // Check for specific Google Ads API errors
         let errorMessage = error.message;
-        if (error.errors && error.errors.length > 0) {
-            errorMessage = error.errors.map(e => e.message || e.error_string).join('; ');
-        }
 
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
                 error: 'Failed to apply recommendation',
-                message: errorMessage,
-                details: error.errors || null
+                message: errorMessage
             })
         };
     }
