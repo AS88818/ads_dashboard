@@ -223,7 +223,11 @@ function renderRecommendations(recommendations) {
 
     elements.recommendationsList.innerHTML = recommendations.slice(0, 8).map((rec, index) => {
         const impact = impactMap[rec.impact?.toLowerCase()] || 'medium';
-        const hasAction = rec.action_type === 'keyword_action' && rec.keyword;
+        // Show Apply button for pause/enable keyword actions (not for negative keywords or bid adjustments)
+        const canApply = rec.action_type === 'keyword_action' &&
+                         rec.keyword &&
+                         rec.target_id?.includes('adGroupCriteria') &&
+                         (rec.suggested_action === 'PAUSED' || rec.suggested_action === 'ENABLED');
         return `
             <div class="recommendation-item">
                 <div class="recommendation-content">
@@ -232,7 +236,7 @@ function renderRecommendations(recommendations) {
                 </div>
                 <div class="recommendation-actions">
                     <span class="impact-badge ${impact}">${rec.impact || 'Medium'} Impact</span>
-                    ${hasAction ? `<button class="action-btn" onclick="applyRecommendation(${index})" title="This will pause the keyword in Google Ads">Apply</button>` : ''}
+                    ${canApply ? `<button class="action-btn" onclick="applyRecommendation(${index})">Apply</button>` : ''}
                 </div>
             </div>
         `;

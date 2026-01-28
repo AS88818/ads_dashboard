@@ -581,18 +581,21 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .action-btn {
-    padding: 8px 16px;
+    padding: 10px 20px;
     background-color: var(--accent-orange);
     border: none;
     border-radius: 6px;
-    color: var(--text-primary);
-    font-size: 12px;
-    font-weight: 500;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(255, 92, 0, 0.3);
 }
 
 .action-btn:hover {
