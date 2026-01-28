@@ -1,7 +1,7 @@
 {
   "customer_id": "7867388610",
   "account_name": "YCK Chiropractic",
-  "generated_at": "2026-01-29T00:19:34.563088",
+  "generated_at": "2026-01-29T02:26:57.661460",
   "date_range": {
     "start": "2024-12-29",
     "end": "2025-01-28"
@@ -23,7 +23,7 @@
   },
   "campaigns": [
     {
-      "name": "Unknown",
+      "name": "YCK Main Search #3",
       "status": "PAUSED",
       "spend": 6827.62,
       "impressions": 231642,
@@ -33,92 +33,12 @@
       "cpa": 6827.62
     },
     {
-      "name": "Unknown",
+      "name": "YCK Main Search Malay",
       "status": "PAUSED",
       "spend": 3.14,
       "impressions": 276,
       "clicks": 8,
       "ctr": 2.9,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
-      "conversions": 0.0,
-      "cpa": 0
-    },
-    {
-      "name": "Unknown",
-      "status": "PAUSED",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "ctr": 0.0,
       "conversions": 0.0,
       "cpa": 0
     }
@@ -213,9 +133,75 @@
       "ctr": 5.4,
       "avg_cpc": 0.82,
       "quality_score": 2
+    },
+    {
+      "keyword": "joint pain relief",
+      "campaign": "YCK Main Search #3",
+      "impressions": 3550,
+      "clicks": 426,
+      "ctr": 12.0,
+      "avg_cpc": 0.45,
+      "quality_score": 0
+    },
+    {
+      "keyword": "shoulder pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 3538,
+      "clicks": 220,
+      "ctr": 6.22,
+      "avg_cpc": 0.66,
+      "quality_score": 3
+    },
+    {
+      "keyword": "plantar fasciitis",
+      "campaign": "YCK Main Search #3",
+      "impressions": 3439,
+      "clicks": 146,
+      "ctr": 4.25,
+      "avg_cpc": 0.85,
+      "quality_score": 1
+    },
+    {
+      "keyword": "elbow pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 2736,
+      "clicks": 97,
+      "ctr": 3.55,
+      "avg_cpc": 0.78,
+      "quality_score": 3
+    },
+    {
+      "keyword": "slip disc",
+      "campaign": "YCK Main Search #3",
+      "impressions": 2732,
+      "clicks": 140,
+      "ctr": 5.12,
+      "avg_cpc": 0.84,
+      "quality_score": 3
     }
   ],
-  "insights": [],
+  "insights": [
+    {
+      "type": "warning",
+      "title": "Low Quality Scores",
+      "description": "Average quality score is 2.3/10. Improving ad relevance and landing pages could reduce CPC by 20-30%."
+    },
+    {
+      "type": "alert",
+      "title": "High CPA Alert",
+      "description": "Cost per conversion is RM 6,830.76. Review conversion tracking setup and optimize for better performing keywords."
+    },
+    {
+      "type": "opportunity",
+      "title": "Top Performing Keywords",
+      "description": "\"plantar fasciitis treatment\" has 8.54% CTR - consider increasing budget allocation for this keyword."
+    },
+    {
+      "type": "info",
+      "title": "Campaign Status",
+      "description": "Main campaign \"YCK Main Search #3\" is currently PAUSED. Consider reactivating with optimized keywords."
+    }
+  ],
   "recommendations": [
     {
       "title": "Pause: arthritis",
@@ -233,12 +219,12 @@
       "impact": "High"
     },
     {
-      "title": ": heel spur surgery",
+      "title": "Review: heel spur surgery",
       "description": "0 conversions despite RM 46.43 spend. Reduce bid to test at lower position",
       "impact": "Medium"
     },
     {
-      "title": ": osteoarthritis treatment",
+      "title": "Review: osteoarthritis treatment",
       "description": "0 conversions despite RM 41.03 spend. Reduce bid to test at lower position",
       "impact": "Medium"
     }
