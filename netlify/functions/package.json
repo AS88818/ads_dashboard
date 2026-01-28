@@ -1,0 +1,8 @@
+{
+  "name": "google-ads-dashboard-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for Google Ads Insights Dashboard",
+  "dependencies": {
+    "google-ads-api": "^14.1.0"
+  }
+}

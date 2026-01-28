@@ -1,0 +1,246 @@
+{
+  "customer_id": "7867388610",
+  "account_name": "YCK Chiropractic",
+  "generated_at": "2026-01-29T00:19:34.563088",
+  "date_range": {
+    "start": "2024-12-29",
+    "end": "2025-01-28"
+  },
+  "summary": {
+    "total_spend": 6830.76,
+    "total_impressions": 231918,
+    "total_clicks": 10341,
+    "total_conversions": 1.0,
+    "cost_per_conversion": 6830.76,
+    "avg_ctr": 4.46,
+    "avg_quality_score": 2.3
+  },
+  "trends": {
+    "spend_change": 0,
+    "conversions_change": 0,
+    "cpa_change": 0,
+    "quality_score_change": 0
+  },
+  "campaigns": [
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 6827.62,
+      "impressions": 231642,
+      "clicks": 10333,
+      "ctr": 4.46,
+      "conversions": 1.0,
+      "cpa": 6827.62
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 3.14,
+      "impressions": 276,
+      "clicks": 8,
+      "ctr": 2.9,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    },
+    {
+      "name": "Unknown",
+      "status": "PAUSED",
+      "spend": 0.0,
+      "impressions": 0,
+      "clicks": 0,
+      "ctr": 0.0,
+      "conversions": 0.0,
+      "cpa": 0
+    }
+  ],
+  "keywords": [
+    {
+      "keyword": "back pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 10554,
+      "clicks": 357,
+      "ctr": 3.38,
+      "avg_cpc": 0.62,
+      "quality_score": 3
+    },
+    {
+      "keyword": "knee pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 9617,
+      "clicks": 533,
+      "ctr": 5.54,
+      "avg_cpc": 0.55,
+      "quality_score": 3
+    },
+    {
+      "keyword": "sciatica",
+      "campaign": "YCK Main Search #3",
+      "impressions": 7640,
+      "clicks": 421,
+      "ctr": 5.51,
+      "avg_cpc": 0.82,
+      "quality_score": 3
+    },
+    {
+      "keyword": "neck pain",
+      "campaign": "YCK Main Search #3",
+      "impressions": 7067,
+      "clicks": 223,
+      "ctr": 3.16,
+      "avg_cpc": 0.77,
+      "quality_score": 3
+    },
+    {
+      "keyword": "arthritis",
+      "campaign": "YCK Main Search #3",
+      "impressions": 6949,
+      "clicks": 366,
+      "ctr": 5.27,
+      "avg_cpc": 0.73,
+      "quality_score": 1
+    },
+    {
+      "keyword": "herniated disc",
+      "campaign": "YCK Main Search #3",
+      "impressions": 6058,
+      "clicks": 195,
+      "ctr": 3.22,
+      "avg_cpc": 0.8,
+      "quality_score": 3
+    },
+    {
+      "keyword": "plantar fasciitis treatment",
+      "campaign": "YCK Main Search #3",
+      "impressions": 4510,
+      "clicks": 385,
+      "ctr": 8.54,
+      "avg_cpc": 0.86,
+      "quality_score": 3
+    },
+    {
+      "keyword": "frozen shoulder",
+      "campaign": "YCK Main Search #3",
+      "impressions": 4365,
+      "clicks": 268,
+      "ctr": 6.14,
+      "avg_cpc": 0.8,
+      "quality_score": 3
+    },
+    {
+      "keyword": "scoliosis treatment",
+      "campaign": "YCK Main Search #3",
+      "impressions": 3691,
+      "clicks": 130,
+      "ctr": 3.52,
+      "avg_cpc": 0.82,
+      "quality_score": 3
+    },
+    {
+      "keyword": "carpal tunnel syndrome",
+      "campaign": "YCK Main Search #3",
+      "impressions": 3592,
+      "clicks": 194,
+      "ctr": 5.4,
+      "avg_cpc": 0.82,
+      "quality_score": 2
+    }
+  ],
+  "insights": [],
+  "recommendations": [
+    {
+      "title": "Pause: arthritis",
+      "description": "Quality Score of 1, 0 conversions, RM 265.40 wasted. CTR 5.3%",
+      "impact": "High"
+    },
+    {
+      "title": "Pause: carpal tunnel syndrome",
+      "description": "Quality Score of 2, 0 conversions, RM 158.55 wasted. CTR 5.4%",
+      "impact": "High"
+    },
+    {
+      "title": "Pause: plantar fasciitis",
+      "description": "Quality Score of 1, 0 conversions, RM 123.39 wasted. CTR 4.2%",
+      "impact": "High"
+    },
+    {
+      "title": ": heel spur surgery",
+      "description": "0 conversions despite RM 46.43 spend. Reduce bid to test at lower position",
+      "impact": "Medium"
+    },
+    {
+      "title": ": osteoarthritis treatment",
+      "description": "0 conversions despite RM 41.03 spend. Reduce bid to test at lower position",
+      "impact": "Medium"
+    }
+  ]
+}

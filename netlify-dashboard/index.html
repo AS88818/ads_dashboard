@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Ads Insights Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"/>
+                        <path d="m19 9-5 5-4-4-3 3"/>
+                    </svg>
+                    <span>Ads Insights</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"/>
+                        <rect x="14" y="3" width="7" height="5"/>
+                        <rect x="14" y="12" width="7" height="9"/>
+                        <rect x="3" y="16" width="7" height="5"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#campaigns" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <span>Campaigns</span>
+                </a>
+                <a href="#keywords" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="9" x2="20" y2="9"/>
+                        <line x1="4" y1="15" x2="20" y2="15"/>
+                        <line x1="10" y1="3" x2="8" y2="21"/>
+                        <line x1="16" y1="3" x2="14" y2="21"/>
+                    </svg>
+                    <span>Keywords</span>
+                </a>
+                <a href="#recommendations" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4"/>
+                        <path d="m6.8 14-3.5 2"/>
+                        <path d="m20.7 16-3.5-2"/>
+                        <path d="M6.8 10 3.3 8"/>
+                        <path d="m20.7 8-3.5 2"/>
+                        <circle cx="12" cy="12" r="4"/>
+                    </svg>
+                    <span>Recommendations</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="last-updated">
+                    <span class="label">Last updated</span>
+                    <span class="value" id="lastUpdated">Loading...</span>
+                </div>
+                <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                    </svg>
+                    Refresh Data
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="page-header">
+                <div class="header-left">
+                    <h1>Google Ads Insights</h1>
+                    <p class="subtitle" id="accountName">Loading account...</p>
+                </div>
+                <div class="header-right">
+                    <div class="date-range" id="dateRange">Last 30 days</div>
+                </div>
+            </header>
+
+            <!-- Loading State -->
+            <div class="loading-state" id="loadingState">
+                <div class="spinner"></div>
+                <p>Loading insights...</p>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state" id="errorState" style="display: none;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p id="errorMessage">Failed to load data</p>
+                <button onclick="loadData()">Try Again</button>
+            </div>
+
+            <!-- Dashboard Content -->
+            <div class="dashboard-content" id="dashboardContent" style="display: none;">
+                <!-- KPI Cards -->
+                <section class="kpi-section">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Total Spend</span>
+                            <span class="kpi-trend" id="spendTrend"></span>
+                        </div>
+                        <div class="kpi-value" id="totalSpend">--</div>
+                        <div class="kpi-subtitle" id="spendPeriod">Last 30 days</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Conversions</span>
+                            <span class="kpi-trend" id="conversionsTrend"></span>
+                        </div>
+                        <div class="kpi-value" id="totalConversions">--</div>
+                        <div class="kpi-subtitle" id="conversionsPeriod">Last 30 days</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Cost per Conversion</span>
+                            <span class="kpi-trend" id="cpaTrend"></span>
+                        </div>
+                        <div class="kpi-value" id="costPerConversion">--</div>
+                        <div class="kpi-subtitle" id="cpaPeriod">Last 30 days</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Avg. Quality Score</span>
+                            <span class="kpi-trend" id="qsTrend"></span>
+                        </div>
+                        <div class="kpi-value" id="avgQualityScore">--</div>
+                        <div class="kpi-subtitle">Across all keywords</div>
+                    </div>
+                </section>
+
+                <!-- Campaign Performance Table -->
+                <section class="table-section" id="campaigns">
+                    <div class="section-header">
+                        <h2>Campaign Performance</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Campaign</th>
+                                    <th>Status</th>
+                                    <th>Spend</th>
+                                    <th>Impressions</th>
+                                    <th>Clicks</th>
+                                    <th>CTR</th>
+                                    <th>Conversions</th>
+                                    <th>CPA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="campaignTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Keywords Section -->
+                <section class="table-section" id="keywords">
+                    <div class="section-header">
+                        <h2>Top Keywords</h2>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Keyword</th>
+                                    <th>Campaign</th>
+                                    <th>Impressions</th>
+                                    <th>Clicks</th>
+                                    <th>CTR</th>
+                                    <th>Avg CPC</th>
+                                    <th>Quality Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keywordTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- AI Insights Section -->
+                <section class="insights-section">
+                    <div class="section-header">
+                        <h2>AI Insights</h2>
+                        <span class="ai-badge">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/>
+                            </svg>
+                            AI Generated
+                        </span>
+                    </div>
+                    <div class="insights-grid" id="insightsGrid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- Recommendations Section -->
+                <section class="recommendations-section" id="recommendations">
+                    <div class="section-header">
+                        <h2>Recommendations</h2>
+                    </div>
+                    <div class="recommendations-list" id="recommendationsList">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
