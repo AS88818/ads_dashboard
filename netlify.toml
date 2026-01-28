@@ -7,12 +7,7 @@
   # Functions directory
   functions = "netlify/functions"
 
-# Redirect all requests to index.html for SPA routing (if needed)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {Role = ["admin"]}
+# Note: No SPA redirects needed - this is a single-page static site
 
 # Headers for security and caching
 [[headers]]
