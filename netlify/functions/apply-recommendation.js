@@ -141,6 +141,31 @@ async function addNegativeKeyword(accessToken, customerId, campaignId, keyword, 
     return await executeMutate(accessToken, customerId, 'campaignCriteria', operations);
 }
 
+// Adjust keyword bid
+async function adjustKeywordBid(accessToken, customerId, targetId, newBid) {
+    const parsed = parseTargetId(targetId);
+    if (!parsed) {
+        throw new Error(`Invalid target_id format: ${targetId}`);
+    }
+
+    const { adGroupId, criterionId } = parsed;
+    const resourceName = `customers/${customerId}/adGroupCriteria/${adGroupId}~${criterionId}`;
+
+    // Convert bid to micros (1 currency unit = 1,000,000 micros)
+    // Round to nearest 0.01 (10,000 micros) to meet billable unit requirement
+    const bidMicros = Math.round(newBid * 1000000 / 10000) * 10000;
+
+    const operations = [{
+        updateMask: 'cpcBidMicros',
+        update: {
+            resourceName: resourceName,
+            cpcBidMicros: bidMicros.toString()
+        }
+    }];
+
+    return await executeMutate(accessToken, customerId, 'adGroupCriteria', operations);
+}
+
 // Main handler
 exports.handler = async (event, context) => {
     // CORS headers
@@ -189,7 +214,7 @@ exports.handler = async (event, context) => {
 
     try {
         const body = JSON.parse(event.body || '{}');
-        const { action_type, target_id, keyword, suggested_action, campaign_id, match_type } = body;
+        const { action_type, target_id, keyword, suggested_action, campaign_id, match_type, new_bid } = body;
 
         if (!action_type) {
             return {
@@ -262,18 +287,36 @@ exports.handler = async (event, context) => {
                 break;
 
             case 'bid_adjustment':
-                // Bid adjustments require user input for the new bid amount
-                // Return instructions instead of making changes
-                return {
-                    statusCode: 200,
-                    headers,
-                    body: JSON.stringify({
-                        success: false,
-                        message: `Bid adjustments require you to specify the new bid amount. Please go to Google Ads UI to adjust the bid for "${keyword}".`,
-                        manual_action_required: true,
-                        google_ads_url: `https://ads.google.com/aw/keywords?campaignId=${campaign_id || ''}`
-                    })
-                };
+                // Bid adjustments require target_id and new_bid
+                if (!target_id) {
+                    return {
+                        statusCode: 400,
+                        headers,
+                        body: JSON.stringify({ error: 'Missing target_id for bid adjustment' })
+                    };
+                }
+                if (!new_bid || isNaN(parseFloat(new_bid))) {
+                    return {
+                        statusCode: 400,
+                        headers,
+                        body: JSON.stringify({
+                            error: 'Missing or invalid new_bid amount',
+                            requires_input: true,
+                            input_type: 'bid_amount'
+                        })
+                    };
+                }
+                const bidAmount = parseFloat(new_bid);
+                if (bidAmount <= 0) {
+                    return {
+                        statusCode: 400,
+                        headers,
+                        body: JSON.stringify({ error: 'Bid amount must be greater than 0' })
+                    };
+                }
+                result = await adjustKeywordBid(accessToken, customerId, target_id, bidAmount);
+                message = `Successfully adjusted bid for "${keyword}" to RM ${bidAmount.toFixed(2)}`;
+                break;
 
             default:
                 return {

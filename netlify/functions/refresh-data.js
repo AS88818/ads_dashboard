@@ -179,8 +179,11 @@ exports.handler = async (event, context) => {
         console.log('Fetching keyword data...');
         const keywordQuery = `
             SELECT
+                ad_group_criterion.resource_name,
                 ad_group_criterion.keyword.text,
+                ad_group_criterion.cpc_bid_micros,
                 campaign.name,
+                campaign.id,
                 metrics.impressions,
                 metrics.clicks,
                 metrics.ctr,
@@ -271,10 +274,13 @@ exports.handler = async (event, context) => {
         const keywords = keywordResults.map(row => ({
             keyword: row.adGroupCriterion?.keyword?.text || 'Unknown',
             campaign: row.campaign?.name || '-',
+            campaign_id: row.campaign?.id || null,
+            resource_name: row.adGroupCriterion?.resourceName || null,
             impressions: parseInt(row.metrics?.impressions || 0),
             clicks: parseInt(row.metrics?.clicks || 0),
             ctr: parseFloat(row.metrics?.ctr || 0) * 100,
             avg_cpc: (row.metrics?.averageCpc || 0) / 1000000,
+            current_bid: (row.adGroupCriterion?.cpcBidMicros || 0) / 1000000,
             quality_score: row.adGroupCriterion?.qualityInfo?.qualityScore || null
         }));
 
@@ -463,21 +469,57 @@ function generateRecommendations(summary, campaigns, keywords, searchQueries, ca
         });
     }
 
-    // Budget increase for top campaign
-    const enabledCampaigns = campaigns.filter(c => c.status === 'ENABLED' && c.conversions > 0);
-    const bestCampaign = enabledCampaigns.sort((a, b) => a.cpa - b.cpa)[0];
-    if (bestCampaign) {
+    // Bid adjustments for high-performing keywords with low bids
+    const highPerformingKeywords = keywords.filter(k =>
+        k.quality_score && k.quality_score >= 7 &&
+        k.ctr >= 3 &&
+        k.current_bid > 0 &&
+        k.resource_name
+    );
+    for (const kw of highPerformingKeywords.slice(0, 2)) {
+        // Suggest 20% bid increase for high-quality, high-CTR keywords
+        const suggestedBid = kw.current_bid * 1.2;
         recommendations.push({
-            title: `Increase budget for ${bestCampaign.name}`,
-            description: `This campaign has the lowest CPA (RM ${bestCampaign.cpa.toFixed(2)}). Increasing budget could generate more conversions efficiently.`,
+            title: `Increase Bid: ${kw.keyword}`,
+            description: `Quality score ${kw.quality_score}/10 with ${kw.ctr.toFixed(1)}% CTR. Consider increasing bid to capture more impression share.`,
             impact: 'High',
             action_type: 'bid_adjustment',
-            campaign_id: bestCampaign.id
+            keyword: kw.keyword,
+            target_id: kw.resource_name,
+            campaign_id: kw.campaign_id,
+            current_bid: kw.current_bid,
+            suggested_bid: suggestedBid
         });
     }
 
-    // Pause low quality keywords
-    const lowQualityKeywords = keywords.filter(k => k.quality_score && k.quality_score < 4 && k.clicks > 10);
+    // Bid decrease for low-quality keywords with high bids
+    const lowQualityHighBid = keywords.filter(k =>
+        k.quality_score && k.quality_score < 5 &&
+        k.current_bid > 1 &&
+        k.resource_name
+    );
+    for (const kw of lowQualityHighBid.slice(0, 2)) {
+        // Suggest 30% bid decrease for low-quality keywords
+        const suggestedBid = kw.current_bid * 0.7;
+        recommendations.push({
+            title: `Decrease Bid: ${kw.keyword}`,
+            description: `Low quality score (${kw.quality_score}/10) increases CPC. Reduce bid while improving ad relevance.`,
+            impact: 'Medium',
+            action_type: 'bid_adjustment',
+            keyword: kw.keyword,
+            target_id: kw.resource_name,
+            campaign_id: kw.campaign_id,
+            current_bid: kw.current_bid,
+            suggested_bid: suggestedBid
+        });
+    }
+
+    // Pause low quality keywords with no conversions
+    const lowQualityKeywords = keywords.filter(k =>
+        k.quality_score && k.quality_score < 4 &&
+        k.clicks > 10 &&
+        k.resource_name
+    );
     for (const kw of lowQualityKeywords.slice(0, 2)) {
         recommendations.push({
             title: `Pause Keyword: ${kw.keyword}`,
@@ -485,6 +527,7 @@ function generateRecommendations(summary, campaigns, keywords, searchQueries, ca
             impact: 'Medium',
             action_type: 'keyword_action',
             keyword: kw.keyword,
+            target_id: kw.resource_name,
             suggested_action: 'PAUSED'
         });
     }

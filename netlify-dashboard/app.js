@@ -292,10 +292,10 @@ function renderRecommendations(recommendations) {
             // Add negative keywords (requires campaign_id)
             canApply = true;
             buttonLabel = 'Add Negative';
-        } else if (rec.action_type === 'bid_adjustment') {
-            // Bid adjustments open Google Ads UI
+        } else if (rec.action_type === 'bid_adjustment' && rec.target_id) {
+            // Bid adjustments - can apply with user input for new bid
             canApply = true;
-            buttonLabel = 'Review';
+            buttonLabel = 'Adjust Bid';
         }
 
         return `
@@ -477,12 +477,51 @@ async function applyRecommendation(index) {
     } else if (rec.action_type === 'add_negative_keyword') {
         confirmMessage = `Are you sure you want to add "${rec.keyword}" as a negative keyword?\n\nThis will prevent your ads from showing for searches containing this term.`;
     } else if (rec.action_type === 'bid_adjustment') {
-        // For bid adjustments, open Google Ads UI instead
-        const url = rec.campaign_id
-            ? `https://ads.google.com/aw/keywords?campaignId=${rec.campaign_id}`
-            : 'https://ads.google.com/aw/keywords';
-        if (confirm(`Bid adjustments should be done manually to set the exact amount.\n\nWould you like to open Google Ads to adjust the bid for "${rec.keyword}"?`)) {
-            window.open(url, '_blank');
+        // For bid adjustments, prompt for new bid amount
+        const currentBid = rec.current_bid ? `Current bid: RM ${rec.current_bid.toFixed(2)}\n` : '';
+        const suggestedBid = rec.suggested_bid ? `Suggested bid: RM ${rec.suggested_bid.toFixed(2)}\n\n` : '\n';
+
+        const newBidInput = prompt(
+            `${currentBid}${suggestedBid}Enter the new bid amount for "${rec.keyword}" (in MYR):`,
+            rec.suggested_bid ? rec.suggested_bid.toFixed(2) : ''
+        );
+
+        if (newBidInput === null) return; // User cancelled
+
+        const newBid = parseFloat(newBidInput);
+        if (isNaN(newBid) || newBid <= 0) {
+            alert('Please enter a valid bid amount greater than 0');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to change the bid for "${rec.keyword}" to RM ${newBid.toFixed(2)}?\n\nThis will immediately update the bid in Google Ads.`)) {
+            return;
+        }
+
+        // Apply bid adjustment with the new bid
+        try {
+            const response = await fetch('/.netlify/functions/apply-recommendation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action_type: rec.action_type,
+                    target_id: rec.target_id,
+                    keyword: rec.keyword,
+                    new_bid: newBid
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || result.message || 'Failed to adjust bid');
+            }
+
+            alert(result.message || `Bid adjusted to RM ${newBid.toFixed(2)} successfully!`);
+            await loadData();
+        } catch (error) {
+            console.error('Error adjusting bid:', error);
+            alert(`Failed to adjust bid: ${error.message}\n\nMake sure Google Ads API credentials are configured in Netlify.`);
         }
         return;
     } else {
