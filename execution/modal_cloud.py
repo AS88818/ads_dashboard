@@ -483,9 +483,9 @@ def send_email_report(
 
     start_date, end_date = date_range
 
-    # Calculate totals
+    # Calculate totals (round conversions to int - Google Ads API returns floats)
     total_spend = summary.get('google_spend', 0) + summary.get('facebook_spend', 0)
-    total_conv = summary.get('google_conversions', 0) + summary.get('facebook_conversions', 0)
+    total_conv = int(round(summary.get('google_conversions', 0) + summary.get('facebook_conversions', 0)))
     avg_cpa = total_spend / total_conv if total_conv > 0 else 0
 
     # Compose email
@@ -547,7 +547,7 @@ def send_email_report(
                     <div style="margin-bottom: 15px;">
                         <span style="color: #666; font-size: 14px;">Total Conversions</span>
                         <div style="color: #34a853; font-size: 28px; font-weight: bold;">
-                            {total_conv}
+                            {total_conv:,}
                         </div>
                     </div>
                     <div>
