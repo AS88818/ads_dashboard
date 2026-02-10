@@ -35,20 +35,20 @@ def calculate_exclusion_impact(spend, conversions=0):
     }
 
 
-def calculate_scaling_impact(current_spend, current_conversions, scale_factor=1.25, customer_value=200):
+def calculate_scaling_impact(current_spend, current_conversions, scale_factor=1.25, customer_value=None):
     """
     Calculate impact of scaling budget for top performers.
 
     Assumptions:
     - 25% budget increase → 20% volume increase (diminishing returns)
     - CPA increases 10% (lower intent traffic as you scale)
-    - Default customer value: RM 200
+    - Default customer value: Conservative estimate based on CPA
 
     Args:
         current_spend: Weekly spend
         current_conversions: Weekly conversions
         scale_factor: Budget multiplier (1.25 = 25% increase)
-        customer_value: Revenue per conversion
+        customer_value: Revenue per conversion (if None, uses conservative 3× CPA estimate)
 
     Returns:
         dict with impact metrics, confidence, formula
@@ -64,11 +64,20 @@ def calculate_scaling_impact(current_spend, current_conversions, scale_factor=1.
             'assumptions': []
         }
 
+    # Calculate current CPA
+    current_cpa = current_spend / current_conversions
+
+    # If no customer value provided, use conservative estimate (3× CPA = 200% ROI target)
+    if customer_value is None:
+        customer_value = current_cpa * 3
+        value_note = f'RM {customer_value:.0f} (estimated 3× CPA)'
+    else:
+        value_note = f'RM {customer_value}'
+
     # Diminishing returns: volume doesn't scale 1:1 with budget
     volume_increase_rate = 0.20  # 25% budget → 20% volume
     cpa_degradation = 1.10  # CPA gets 10% worse
 
-    current_cpa = current_spend / current_conversions
     new_cpa = current_cpa * cpa_degradation
     additional_conversions = current_conversions * volume_increase_rate
     additional_revenue = additional_conversions * customer_value
@@ -84,16 +93,16 @@ def calculate_scaling_impact(current_spend, current_conversions, scale_factor=1.
         'new_cpa': new_cpa,
         'confidence': 'moderate',
         'confidence_pct': 70,
-        'formula': f"{current_conversions:.1f} conv × 20% growth × RM {customer_value} - {additional_conversions:.1f} conv × RM {new_cpa:.2f} CPA",
+        'formula': f"{current_conversions:.1f} conv × 20% growth × {value_note} - {additional_conversions:.1f} conv × RM {new_cpa:.2f} CPA",
         'assumptions': [
             f'{int((scale_factor - 1) * 100)}% budget increase → 20% volume increase (diminishing returns)',
             'CPA increases 10% (lower intent traffic)',
-            f'Customer value: RM {customer_value}'
+            f'Customer value: {value_note}'
         ]
     }
 
 
-def calculate_creative_refresh_impact(spend, frequency, current_ctr, current_conversions, customer_value=200):
+def calculate_creative_refresh_impact(spend, frequency, current_ctr, current_conversions, customer_value=None):
     """
     Calculate impact of refreshing fatigued creatives.
 
@@ -125,6 +134,17 @@ def calculate_creative_refresh_impact(spend, frequency, current_ctr, current_con
         conv_rate_improvement = 0.05
         confidence_pct = 60
 
+    # Calculate customer value if not provided
+    if current_conversions > 0 and customer_value is None:
+        current_cpa = spend / current_conversions
+        customer_value = current_cpa * 3
+        value_note = f'RM {customer_value:.0f} (estimated 3× CPA)'
+    elif customer_value is None:
+        customer_value = 100  # Fallback default
+        value_note = 'RM 100 (estimated)'
+    else:
+        value_note = f'RM {customer_value}'
+
     # Additional conversions from improved conversion rate
     additional_conversions = current_conversions * conv_rate_improvement
     additional_revenue = additional_conversions * customer_value
@@ -146,12 +166,12 @@ def calculate_creative_refresh_impact(spend, frequency, current_ctr, current_con
             f'Frequency {frequency:.1f} indicates creative fatigue',
             f'CTR improvement: +{int(ctr_improvement * 100)}%',
             f'Conversion rate improvement: +{int(conv_rate_improvement * 100)}%',
-            f'Customer value: RM {customer_value}'
+            f'Customer value: {value_note}'
         ]
     }
 
 
-def calculate_schedule_impact(wasted_hours_spend, avg_conv_rate=0.02, peak_multiplier=2.5, avg_cpa=50, customer_value=200):
+def calculate_schedule_impact(wasted_hours_spend, avg_conv_rate=0.02, peak_multiplier=2.5, avg_cpa=50, customer_value=None):
     """
     Calculate impact of adjusting ad schedule to avoid wasted hours.
 
@@ -170,31 +190,38 @@ def calculate_schedule_impact(wasted_hours_spend, avg_conv_rate=0.02, peak_multi
     Returns:
         dict with impact metrics, confidence, formula
     """
+    # Calculate customer value if not provided (conservative 3× CPA)
+    if customer_value is None:
+        customer_value = avg_cpa * 3
+        value_note = f'RM {customer_value:.0f} (estimated 3× CPA)'
+    else:
+        value_note = f'RM {customer_value}'
+
     # Conversions if we redirect to peak hours
     redirected_conversions = (wasted_hours_spend / avg_cpa) * peak_multiplier
     additional_revenue = redirected_conversions * customer_value
 
-    # Savings from not wasting money in bad hours
-    monthly_savings = wasted_hours_spend * 4
+    # Savings from not wasting money in bad hours (don't double-count with revenue)
+    monthly_savings = 0  # Conservative: don't count savings AND revenue
 
     return {
         'monthly_savings': monthly_savings,
         'additional_conversions_monthly': redirected_conversions * 4,
         'additional_revenue_monthly': additional_revenue * 4,
-        'net_benefit_monthly': (monthly_savings + additional_revenue) * 4,
-        'confidence': 'high',
-        'confidence_pct': 85,
+        'net_benefit_monthly': additional_revenue * 4,
+        'confidence': 'moderate',
+        'confidence_pct': 70,
         'formula': f"RM {wasted_hours_spend:.2f} redirected to peak hours ({peak_multiplier}× conversion rate)",
         'assumptions': [
             'Peak hours convert at 2.5× average rate',
             f'Redirect RM {wasted_hours_spend:.2f}/week to peak hours',
             f'Average CPA: RM {avg_cpa}',
-            f'Customer value: RM {customer_value}'
+            f'Customer value: {value_note}'
         ]
     }
 
 
-def calculate_bid_adjustment_impact(current_bid, suggested_bid, keyword_spend, keyword_conversions, customer_value=200):
+def calculate_bid_adjustment_impact(current_bid, suggested_bid, keyword_spend, keyword_conversions, customer_value=None):
     """
     Calculate impact of bid adjustments (Google Ads).
 
@@ -225,6 +252,17 @@ def calculate_bid_adjustment_impact(current_bid, suggested_bid, keyword_spend, k
 
     bid_change_pct = (suggested_bid - current_bid) / current_bid
 
+    # Calculate customer value if not provided
+    if keyword_conversions > 0 and customer_value is None:
+        current_cpa = keyword_spend / keyword_conversions
+        customer_value = current_cpa * 3
+        value_note = f'RM {customer_value:.0f} (estimated 3× CPA)'
+    elif customer_value is None:
+        customer_value = 100  # Fallback default
+        value_note = 'RM 100 (estimated)'
+    else:
+        value_note = f'RM {customer_value}'
+
     if bid_change_pct > 0:  # Increase bid
         # Volume doesn't scale 1:1 with bid - use 80% efficiency
         volume_increase = bid_change_pct * 0.8
@@ -239,12 +277,12 @@ def calculate_bid_adjustment_impact(current_bid, suggested_bid, keyword_spend, k
             'additional_spend_monthly': additional_spend * 4,
             'additional_revenue_monthly': additional_revenue * 4,
             'net_benefit_monthly': net_benefit * 4,
-            'confidence': 'high',
-            'confidence_pct': 85,
+            'confidence': 'moderate',
+            'confidence_pct': 70,
             'formula': f"+{int(bid_change_pct * 100)}% bid → +{int(volume_increase * 100)}% volume = {additional_conversions:.1f} conv/week",
             'assumptions': [
                 f'{int(bid_change_pct * 100)}% bid increase → {int(volume_increase * 100)}% volume increase (80% efficiency)',
-                f'Customer value: RM {customer_value}'
+                f'Customer value: {value_note}'
             ]
         }
     else:  # Decrease bid
@@ -266,7 +304,7 @@ def calculate_bid_adjustment_impact(current_bid, suggested_bid, keyword_spend, k
         }
 
 
-def calculate_geo_adjustment_impact(current_spend, current_conversions, geo_performance_multiplier, customer_value=200):
+def calculate_geo_adjustment_impact(current_spend, current_conversions, geo_performance_multiplier, customer_value=None):
     """
     Calculate impact of geographic bid adjustments or exclusions.
 
@@ -286,6 +324,17 @@ def calculate_geo_adjustment_impact(current_spend, current_conversions, geo_perf
         # High performing geo - recommend scaling
         return calculate_scaling_impact(current_spend, current_conversions, scale_factor=1.20, customer_value=customer_value)
     else:
+        # Calculate customer value if not provided
+        if current_conversions > 0 and customer_value is None:
+            current_cpa = current_spend / current_conversions
+            customer_value = current_cpa * 3
+            value_note = f'RM {customer_value:.0f} (estimated 3× CPA)'
+        elif customer_value is None:
+            customer_value = 100  # Fallback default
+            value_note = 'RM 100 (estimated)'
+        else:
+            value_note = f'RM {customer_value}'
+
         # Moderate adjustment
         bid_adjustment = (geo_performance_multiplier - 1.0) * 0.5  # Conservative adjustment
         spend_change = current_spend * bid_adjustment
@@ -305,12 +354,12 @@ def calculate_geo_adjustment_impact(current_spend, current_conversions, geo_perf
             'assumptions': [
                 f'Geographic performance: {geo_performance_multiplier:.1f}× average',
                 'Conservative bid adjustment (50% of performance difference)',
-                f'Customer value: RM {customer_value}'
+                f'Customer value: {value_note}'
             ]
         }
 
 
-def calculate_budget_adjustment_impact(current_budget, suggested_budget, current_conversions, customer_value=200):
+def calculate_budget_adjustment_impact(current_budget, suggested_budget, current_conversions, customer_value=None):
     """
     Calculate impact of campaign budget adjustments.
 
