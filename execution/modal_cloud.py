@@ -55,6 +55,8 @@ image = (
     .add_local_file(project_root / "execution" / "analyze_advanced_insights.py", "/root/analyze_advanced_insights.py")
     .add_local_file(project_root / "execution" / "analyze_facebook_insights.py", "/root/analyze_facebook_insights.py")
     .add_local_file(project_root / "execution" / "utils.py", "/root/utils.py")
+    .add_local_file(project_root / "execution" / "impact_models.py", "/root/impact_models.py")
+    .add_local_file(project_root / "execution" / "calculate_total_impact.py", "/root/calculate_total_impact.py")
     .add_local_file(project_root / "clients.json", "/root/clients.json")
 )
 
