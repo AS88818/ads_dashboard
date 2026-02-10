@@ -35,6 +35,14 @@ from analyze_facebook_insights import (
     analyze_geo_bid_opportunities,
 )
 
+from impact_models import (
+    calculate_exclusion_impact,
+    calculate_scaling_impact,
+    calculate_creative_refresh_impact,
+    calculate_schedule_impact,
+    get_automation_metadata,
+)
+
 
 def generate_insights_summary(metrics, audience_analysis, creative_analysis,
                                placement_analysis, budget_analysis):
@@ -128,45 +136,69 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
 
     # 1. Audience exclusion recommendations
     for seg in audience_analysis.get('wasted_segments', [])[:3]:
+        # Calculate impact
+        impact_data = calculate_exclusion_impact(seg['spend'], conversions=0)
+        automation = get_automation_metadata('audience_exclusion', platform='facebook')
+
         rec = {
             'type': 'audience_exclusion',
             'action': f"Exclude {seg['segment']}",
             'reason': f"Spent {currency} {seg['spend']:,.2f} with zero conversions on {seg['type']} segment '{seg['segment']}'.",
-            'expected_impact': f"Save {currency} {seg['spend']:,.2f} monthly",
+            'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f} monthly ({impact_data['confidence_pct']}% confidence)",
             'priority': 'high',
             'segment': seg['segment'],
             'segment_type': seg['type'],
             'adset_id': top_adset_id,  # Added for automation
             'adset_name': top_adset_name,  # Fallback for ID lookup
+            'impact_data': impact_data,
+            'automation': automation,
         }
         recommendations.append(rec)
 
     # 2. Creative fatigue recommendations
     for ad in creative_analysis.get('fatigued_ads', [])[:3]:
         severity = ad.get('fatigue_level', 'warning')
+
+        # Calculate impact
+        impact_data = calculate_creative_refresh_impact(
+            spend=ad.get('spend', 0),
+            frequency=ad.get('frequency', 1),
+            current_ctr=ad.get('ctr', 0) / 100.0,  # Convert percentage to decimal
+            current_conversions=ad.get('conversions', 0)
+        )
+        automation = get_automation_metadata('creative_refresh', platform='facebook')
+
         rec = {
             'type': 'creative_refresh',
             'action': f"Refresh ad: {ad['ad_name'][:50]}",
             'reason': f"Frequency {ad['frequency']:.1f}x, CTR {ad['ctr']:.2f}%. {'; '.join(ad.get('issues', []))}",
-            'expected_impact': 'Improved CTR and lower CPC after creative refresh',
+            'expected_impact': f"+{impact_data['ctr_improvement_pct']}% CTR, +{impact_data.get('additional_conversions_monthly', 0):.1f} conversions/month ({impact_data['confidence_pct']}% confidence)",
             'priority': 'high' if severity == 'critical' else 'medium',
             'ad_name': ad['ad_name'],
             'campaign_name': ad.get('campaign_name', ''),
+            'impact_data': impact_data,
+            'automation': automation,
         }
         recommendations.append(rec)
 
     # 3. Placement removal recommendations
     for pl in placement_analysis.get('placements', []):
         if pl.get('efficiency') == 'poor' and pl['spend'] > 10:
+            # Calculate impact
+            impact_data = calculate_exclusion_impact(pl['spend'], conversions=0)
+            automation = get_automation_metadata('placement_exclusion', platform='facebook')
+
             rec = {
                 'type': 'placement_exclusion',
                 'action': f"Remove placement: {pl['placement_name']}",
                 'reason': f"Spent {currency} {pl['spend']:,.2f} with zero conversions on {pl['placement_name']}.",
-                'expected_impact': f"Save {currency} {pl['spend']:,.2f} monthly",
+                'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f} monthly ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high' if pl['spend'] > 50 else 'medium',
                 'placement': pl['placement_name'],
                 'adset_id': top_adset_id,  # Added for automation
                 'adset_name': top_adset_name,  # Fallback for ID lookup
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
             if len([r for r in recommendations if r['type'] == 'placement_exclusion']) >= 3:
@@ -175,6 +207,16 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
     # 4. Budget recommendations
     for pacing in budget_analysis.get('campaign_pacing', []):
         if pacing.get('status') == 'underspending':
+            automation = get_automation_metadata('budget_adjustment', platform='facebook')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': 0,
+                'confidence': 'low',
+                'confidence_pct': 50,
+                'formula': 'Informational - results depend on campaign quality',
+                'assumptions': ['Campaign is being limited by budget']
+            }
+
             rec = {
                 'type': 'budget_adjustment',
                 'action': f"Increase budget for {pacing['campaign_name']}",
@@ -182,9 +224,21 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': 'More impressions and potential conversions',
                 'priority': 'medium',
                 'campaign_name': pacing['campaign_name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
         elif pacing.get('status') == 'overspending':
+            automation = get_automation_metadata('budget_adjustment', platform='facebook')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': 0,
+                'confidence': 'low',
+                'confidence_pct': 50,
+                'formula': 'Informational - review needed',
+                'assumptions': ['Overspending may indicate good performance or budget misconfiguration']
+            }
+
             rec = {
                 'type': 'budget_adjustment',
                 'action': f"Review overspend on {pacing['campaign_name']}",
@@ -192,21 +246,29 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': 'Better budget control',
                 'priority': 'low',
                 'campaign_name': pacing['campaign_name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 5. Geographic recommendations
     for loc in geo_analysis.get('poor_locations', [])[:2]:
+        # Calculate impact
+        impact_data = calculate_exclusion_impact(loc['spend'], conversions=0)
+        automation = get_automation_metadata('geo_exclusion', platform='facebook')
+
         rec = {
             'type': 'geo_exclusion',
             'action': f"Exclude or reduce spend in {loc['location']}",
             'reason': f"Spent {currency} {loc['spend']:,.2f} with {loc['clicks']} clicks but zero conversions.",
-            'expected_impact': f"Save {currency} {loc['spend']:,.2f}",
+            'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f} monthly ({impact_data['confidence_pct']}% confidence)",
             'priority': 'medium',
             'location': loc['location'],
             'adset_id': top_adset_id,  # Added for automation
             'adset_name': top_adset_name,  # Fallback for ID lookup
             'region_key': loc.get('region_key'),  # Location ID if available
+            'impact_data': impact_data,
+            'automation': automation,
         }
         recommendations.append(rec)
 
@@ -223,54 +285,88 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
             peak_hours = [int(h) if isinstance(h, (int, str)) and str(h).isdigit() else None for h in peak_hours]
             peak_hours = [h for h in peak_hours if h is not None]
 
+            # Calculate impact
+            impact_data = calculate_schedule_impact(wasted_hours_spend=wasted_in_worst)
+            automation = get_automation_metadata('schedule_adjustment', platform='facebook')
+
             rec = {
                 'type': 'schedule_adjustment',
                 'action': f"Focus budget on peak hours (around {best_hour['hour_label']})",
                 'reason': f"{currency} {wasted_in_worst:,.2f} spent during low-performing hours with zero conversions. Best hour: {best_hour['hour_label']} with {best_hour['clicks']} clicks.",
-                'expected_impact': f"Save {currency} {wasted_in_worst:,.2f} and improve conversion rate",
+                'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f}/month + {impact_data['additional_conversions_monthly']:.1f} more conversions ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'medium',
                 'adset_id': top_adset_id,  # Added for automation
                 'adset_name': top_adset_name,  # Fallback for ID lookup
                 'best_hours': peak_hours if peak_hours else [int(best_hour.get('hour', best_hour.get('hour_label', '').split(':')[0]))],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 7. TOP PERFORMER SCALING
     if top_perf_analysis:
         for candidate in top_perf_analysis.get('scale_candidates', [])[:3]:
+            # Calculate impact
+            impact_data = calculate_scaling_impact(
+                current_spend=candidate.get('spend', 0),
+                current_conversions=candidate.get('conversions', 0),
+                scale_factor=1.25
+            )
+            automation = get_automation_metadata('budget_scaling', platform='facebook')
+
             rec = {
                 'type': 'budget_scaling',
                 'action': f"Scale budget for {candidate['name']}",
                 'reason': f"CPA {currency} {candidate['cpa']:,.2f} is {candidate['vs_avg_cpa']}% below account average. "
                          f"Conversion rate {candidate['conv_rate']}% with {candidate['conversions']} conversions.",
-                'expected_impact': f"More conversions at {currency} {candidate['cpa']:,.2f} CPA (increase budget 20-30%)",
+                'expected_impact': f"+{impact_data['additional_conversions_monthly']:.1f} conversions/month, +{currency} {impact_data.get('additional_revenue_monthly', 0):,.2f} revenue ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
                 'campaign_name': candidate['name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
         for candidate in top_perf_analysis.get('review_candidates', [])[:2]:
+            # Calculate impact (savings from pausing)
+            impact_data = calculate_exclusion_impact(candidate.get('spend', 0), conversions=0)
+            automation = get_automation_metadata('campaign_review', platform='facebook')
+
             rec = {
                 'type': 'campaign_review',
                 'action': f"Review or pause {candidate['name']}",
                 'reason': f"Spent {currency} {candidate['spend']:,.2f} with zero conversions. {candidate['clicks']} clicks but no results.",
-                'expected_impact': f"Save {currency} {candidate['spend']:,.2f} or fix conversion tracking",
+                'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f} monthly or fix conversion tracking ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
                 'campaign_name': candidate['name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 8. AUDIENCE FATIGUE
     if fatigue_analysis:
         for camp in fatigue_analysis.get('fatigued_campaigns', [])[:2]:
+            automation = get_automation_metadata('audience_fatigue', platform='facebook')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': camp.get('conversions', 0) * 0.15 * 4,  # Estimate 15% improvement
+                'confidence': 'moderate',
+                'confidence_pct': 65,
+                'formula': f"Frequency reduction from {camp['frequency']:.1f}x → estimated 15% conversion improvement",
+                'assumptions': ['Expanding audience reduces frequency', 'Fresh users convert better']
+            }
+
             rec = {
                 'type': 'audience_fatigue',
                 'action': f"Expand audience for {camp['campaign_name']}",
                 'reason': f"Frequency {camp['frequency']}x - audience is seeing ads too often "
                          f"(reach: {camp['reach']:,}). {camp['suggestion']}.",
-                'expected_impact': 'Reduce frequency, lower CPM, reach fresh users',
+                'expected_impact': f"Reduce frequency, +{impact_data['additional_conversions_monthly']:.1f} conversions/month ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high' if camp['severity'] == 'critical' else 'medium',
                 'campaign_name': camp['campaign_name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
@@ -281,12 +377,20 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
         if wasted_days:
             day_names = ', '.join(d['day'] for d in wasted_days[:3])
             total_wasted = dow_analysis.get('total_wasted_on_days', 0)
+
+            # Calculate impact
+            impact_data = calculate_schedule_impact(wasted_hours_spend=total_wasted)
+            automation = get_automation_metadata('day_schedule', platform='facebook')
+
             rec = {
                 'type': 'day_schedule',
                 'action': f"Reduce spend on {day_names}",
                 'reason': f"{currency} {total_wasted:,.2f} spent on zero-conversion days ({day_names}).",
-                'expected_impact': f"Save {currency} {total_wasted:,.2f} weekly",
+                'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f}/month + {impact_data['additional_conversions_monthly']:.1f} more conversions ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'medium',
+                'impact_data': impact_data,
+                'automation': automation,
+                'wasted_days': [d['day'] for d in wasted_days[:3]],
             }
             if best_days:
                 rec['reason'] += f" Best day: {best_days[0]['day']} ({best_days[0]['conversions']} conversions, CPA {currency} {best_days[0]['cpa']:,.2f})."
@@ -295,75 +399,150 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
     # 10. CAMPAIGN OBJECTIVE MISMATCH
     if objective_analysis:
         for mismatch in objective_analysis.get('mismatches', [])[:2]:
+            automation = get_automation_metadata('objective_mismatch', platform='facebook')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': mismatch.get('conversions', 0) * 0.20 * 4,  # Estimate 20% improvement
+                'confidence': 'moderate',
+                'confidence_pct': 65,
+                'formula': 'Estimated 20% CPA improvement from proper objective alignment',
+                'assumptions': ['Better algorithm optimization', 'Improved audience targeting']
+            }
+
             rec = {
                 'type': 'objective_mismatch',
                 'action': f"Switch {mismatch['campaign_name']} to {mismatch['suggested_objective']}",
                 'reason': mismatch['reason'],
-                'expected_impact': 'Better optimization from Meta algorithm, lower CPA',
+                'expected_impact': f"Better optimization, ~20% lower CPA ({impact_data['confidence_pct']}% confidence)",
                 'priority': mismatch.get('priority', 'medium'),
                 'campaign_name': mismatch['campaign_name'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 11. ROAS OPTIMIZATION
     if roas_analysis:
         for opp in roas_analysis.get('scale_opportunities', [])[:2]:
+            # Calculate impact - for high ROAS, scaling is beneficial
+            conversions = opp.get('conversion_value', 0) / 200  # Estimate conversions
+            impact_data = calculate_scaling_impact(
+                current_spend=opp.get('spend', 0),
+                current_conversions=conversions,
+                scale_factor=1.30,
+                customer_value=200
+            )
+            automation = get_automation_metadata('roas_scaling', platform='facebook')
+
             rec = {
                 'type': 'roas_scaling',
                 'action': f"Scale {opp['name']} (ROAS {opp['roas']}x)",
                 'reason': f"Generating {currency} {opp['conversion_value']:,.2f} from {currency} {opp['spend']:,.2f} spend. "
                          f"ROAS {opp['roas']}x is highly profitable.",
-                'expected_impact': f"More revenue at {opp['roas']}x return",
+                'expected_impact': f"+{currency} {impact_data.get('additional_revenue_monthly', 0):,.2f} revenue/month ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
         for opp in roas_analysis.get('review_opportunities', [])[:2]:
+            # For negative ROAS, savings come from reducing/pausing
+            loss_monthly = opp.get('loss', 0) * 4
+            automation = get_automation_metadata('roas_review', platform='facebook')
+            impact_data = {
+                'monthly_savings': loss_monthly,
+                'additional_conversions_monthly': 0,
+                'confidence': 'high',
+                'confidence_pct': 85,
+                'formula': f"Weekly loss (RM {opp.get('loss', 0):.2f}) × 4 weeks = RM {loss_monthly:.2f} saved",
+                'assumptions': ['Negative ROAS indicates losing money', 'Reducing budget stops the loss']
+            }
+
             rec = {
                 'type': 'roas_review',
                 'action': f"Review {opp['name']} (ROAS {opp['roas']}x - losing money)",
                 'reason': f"Spending {currency} {opp['spend']:,.2f} but only {currency} {opp['conversion_value']:,.2f} return. "
                          f"Losing {currency} {opp.get('loss', 0):,.2f}.",
-                'expected_impact': f"Stop losing {currency} {opp.get('loss', 0):,.2f}",
+                'expected_impact': f"Stop losing {currency} {loss_monthly:,.2f}/month ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 12. CREATIVE TESTING
     if creative_pattern_analysis:
         for suggestion in creative_pattern_analysis.get('test_suggestions', [])[:2]:
+            automation = get_automation_metadata('creative_test', platform='facebook')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': 0,
+                'confidence': 'moderate',
+                'confidence_pct': 60,
+                'formula': 'A/B testing can yield 10-30% CTR improvements',
+                'assumptions': ['Requires creative development', 'Results vary by test quality']
+            }
+
             rec = {
                 'type': 'creative_test',
                 'action': f"A/B Test: {suggestion['type'].replace('_', ' ').title()}",
                 'reason': suggestion['suggestion'],
-                'expected_impact': 'Improve CTR and conversion rate through systematic testing',
+                'expected_impact': 'Improve CTR and conversion rate through systematic testing (10-30% potential uplift)',
                 'priority': 'medium',
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 13. GEO BID ADJUSTMENTS (scale, not just exclude)
     if geo_bid_analysis:
         for loc in geo_bid_analysis.get('scale_locations', [])[:2]:
+            # Calculate impact - scaling good geos
+            impact_data = calculate_scaling_impact(
+                current_spend=loc.get('spend', 0),
+                current_conversions=loc.get('conversions', 0),
+                scale_factor=1.20
+            )
+            automation = get_automation_metadata('geo_scaling', platform='facebook')
+
             rec = {
                 'type': 'geo_scaling',
                 'action': f"Increase spend in {loc['location']}",
                 'reason': f"CPA {currency} {loc['cpa']:,.2f} is {loc['vs_avg']}% below average. "
                          f"{loc['conversions']} conversions from {currency} {loc['spend']:,.2f} spend.",
-                'expected_impact': f"More conversions at {currency} {loc['cpa']:,.2f} CPA",
+                'expected_impact': f"+{impact_data['additional_conversions_monthly']:.1f} conversions/month at {currency} {loc['cpa']:,.2f} CPA ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'medium',
                 'location': loc['location'],
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 
     # 14. LANDING PAGE ISSUES
     if landing_page_analysis:
         for issue in landing_page_analysis.get('issues', [])[:2]:
+            automation = get_automation_metadata('landing_page', platform='facebook')
+            # Estimate impact - landing page improvements can yield 20-50% conversion uplift
+            current_conversions = issue.get('conversions', 0)
+            estimated_uplift = current_conversions * 0.30  # Conservative 30% estimate
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': estimated_uplift * 4,
+                'confidence': 'moderate',
+                'confidence_pct': 65,
+                'formula': f"Estimated 30% conversion rate improvement from landing page optimization",
+                'assumptions': ['Landing page speed/UX improvements', 'Better conversion funnel', 'Requires website changes']
+            }
+
             rec = {
                 'type': 'landing_page',
                 'action': f"Optimize landing page: {issue['url'][:60]}",
                 'reason': f"{issue['issue']}. {currency} {issue['spend']:,.2f} spent driving traffic to underperforming page.",
-                'expected_impact': 'Improve conversion rate, lower CPA',
+                'expected_impact': f"Improve conversion rate +30%, ~{estimated_uplift * 4:.1f} more conversions/month ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'medium',
+                'impact_data': impact_data,
+                'automation': automation,
             }
             recommendations.append(rec)
 

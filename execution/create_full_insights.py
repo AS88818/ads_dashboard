@@ -22,6 +22,11 @@ from analyze_week2_insights import (
     analyze_geo_performance,
     analyze_time_performance
 )
+from impact_models import (
+    calculate_exclusion_impact,
+    calculate_bid_adjustment_impact,
+    get_automation_metadata,
+)
 
 def create_enhanced_insights(metrics_file, output_insights, output_recommendations):
     """Generate enhanced insights with all Week 1 features."""
@@ -130,6 +135,10 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
     low_qs_no_conv = [k for k in keywords if k.get('quality_score', 0) > 0 and
                       k['quality_score'] <= 2 and k['conversions'] == 0 and k['cost'] > 5]
     for kw in sorted(low_qs_no_conv, key=lambda x: x['cost'], reverse=True)[:3]:
+        # Calculate impact
+        impact_data = calculate_exclusion_impact(kw['cost'], conversions=0)
+        automation = get_automation_metadata('keyword_action', platform='google')
+
         recommendations.append({
             "type": "keyword_action",
             "action": "pause",
@@ -138,7 +147,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "current": "ENABLED",
             "suggested": "PAUSED",
             "reason": f"Quality Score of {kw['quality_score']}, 0 conversions, RM {kw['cost']:.2f} wasted. CTR {kw['ctr']*100:.1f}%",
-            "expected_impact": f"Save RM {kw['cost'] * 4:.0f}/month in wasted spend"
+            "expected_impact": f"Save RM {impact_data['monthly_savings']:.0f}/month ({impact_data['confidence_pct']}% confidence)",
+            "impact_data": impact_data,
+            "automation": automation,
         })
 
     # 2. BID INCREASE RECOMMENDATIONS - for top performers
@@ -150,8 +161,14 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             current_bid = kw.get('avg_cpc', 0)
         suggested_bid = current_bid * 1.25  # 25% increase
 
-        # Calculate expected additional conversions (25% bid increase should yield ~25% more volume)
-        expected_additional_convs = max(1, round(kw['conversions'] * 0.25))
+        # Calculate impact
+        impact_data = calculate_bid_adjustment_impact(
+            current_bid=current_bid,
+            suggested_bid=suggested_bid,
+            keyword_spend=kw['cost'],
+            keyword_conversions=kw['conversions']
+        )
+        automation = get_automation_metadata('bid_adjustment', platform='google')
 
         recommendations.append({
             "type": "bid_adjustment",
@@ -160,7 +177,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "current_bid": current_bid,
             "suggested_bid": suggested_bid,
             "reason": f"Strong performer: {int(kw['conversions'])} conversions at RM {kw.get('cost_per_conversion', 0):.2f} CPA. CTR {kw['ctr']*100:.1f}%",
-            "expected_impact": f"+20-25% impressions, potentially {expected_additional_convs} more conversion{'s' if expected_additional_convs != 1 else ''}/week"
+            "expected_impact": f"+{impact_data.get('additional_conversions_monthly', 0):.1f} conversions/month, +RM {impact_data.get('additional_revenue_monthly', 0):,.2f} revenue ({impact_data['confidence_pct']}% confidence)",
+            "impact_data": impact_data,
+            "automation": automation,
         })
 
     # 3. BID DECREASE RECOMMENDATIONS - for high spend, no conversions
@@ -171,6 +190,16 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
         if current_bid == 0:
             current_bid = kw.get('avg_cpc', 0)
         suggested_bid = current_bid * 0.65  # 35% decrease
+
+        # Calculate impact
+        impact_data = calculate_bid_adjustment_impact(
+            current_bid=current_bid,
+            suggested_bid=suggested_bid,
+            keyword_spend=kw['cost'],
+            keyword_conversions=kw['conversions']
+        )
+        automation = get_automation_metadata('bid_adjustment', platform='google')
+
         recommendations.append({
             "type": "bid_adjustment",
             "target": kw.get('resource_name', kw['keyword_text']),
@@ -178,7 +207,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "current_bid": current_bid,
             "suggested_bid": suggested_bid,
             "reason": f"0 conversions despite RM {kw['cost']:.2f} spend. Reduce bid to test at lower position",
-            "expected_impact": f"Save RM {kw['cost']*0.35*4:.0f}/month while monitoring conversion potential"
+            "expected_impact": f"Save RM {impact_data['monthly_savings']:.0f}/month ({impact_data['confidence_pct']}% confidence)",
+            "impact_data": impact_data,
+            "automation": automation,
         })
 
     # 4. AD COPY RECOMMENDATIONS - based on top performing ad groups
@@ -212,6 +243,16 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             f"No text overlay needed."
         )
 
+        automation = get_automation_metadata('ad_copy', platform='google')
+        impact_data = {
+            'monthly_savings': 0,
+            'additional_conversions_monthly': ag_data['conversions'] * 0.12 * 4,  # 12% CTR improvement
+            'confidence': 'moderate',
+            'confidence_pct': 65,
+            'formula': f"Estimated 12% CTR improvement from targeted ad copy",
+            'assumptions': ['Better ad relevance', 'Improved Quality Score', 'Higher click-through rate']
+        }
+
         recommendations.append({
             "type": "ad_copy",
             "ad_group_name": ag_name,
@@ -220,7 +261,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "final_url": "https://www.yck.com.my",  # Default landing page - update based on campaign
             "image_prompt": image_prompt,
             "reason": f"Ad group '{ag_name}' has {int(ag_data['conversions'])} conversions. Create specific ad highlighting this theme",
-            "expected_impact": "Improve CTR by 10-15%, boost Quality Score"
+            "expected_impact": f"Improve CTR by 10-15%, +{impact_data['additional_conversions_monthly']:.1f} conversions/month ({impact_data['confidence_pct']}% confidence)",
+            "impact_data": impact_data,
+            "automation": automation,
         })
 
     # 5. SEARCH QUERY-BASED NEGATIVE KEYWORDS
@@ -230,6 +273,18 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
         if kw_key in seen_keywords:
             continue
         seen_keywords.add(kw_key)
+
+        # Calculate impact
+        impact_data = {
+            'monthly_savings': neg_kw['wasted_spend'],
+            'additional_conversions_monthly': 0,
+            'confidence': 'high',
+            'confidence_pct': 85,
+            'formula': f"Prevents RM {neg_kw['wasted_spend']:.2f}/month in irrelevant clicks",
+            'assumptions': ['Pattern will continue without negatives', 'No conversion potential from these queries']
+        }
+        automation = get_automation_metadata('keyword_action', platform='google')
+
         recommendations.append({
             "type": "keyword_action",
             "action": "add_negative",
@@ -238,7 +293,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "current": "N/A",
             "suggested": f"NEGATIVE - {neg_kw['match_type']}",
             "reason": neg_kw['reason'],
-            "expected_impact": f"Prevent RM {neg_kw['wasted_spend']:.2f} monthly waste"
+            "expected_impact": f"Prevent RM {neg_kw['wasted_spend']:.2f} monthly waste ({impact_data['confidence_pct']}% confidence)",
+            "impact_data": impact_data,
+            "automation": automation,
         })
 
     # 6. SEARCH QUERY WASTE RECOMMENDATIONS
@@ -281,6 +338,10 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
                 suggested = f"Add '{wasted['search_term']}' as negative keyword (PHRASE match)"
                 target_negative_keywords = [wasted['search_term']]
 
+            # Calculate impact
+            impact_data = calculate_exclusion_impact(wasted['cost'], conversions=0)
+            automation = get_automation_metadata('keyword_action', platform='google')
+
             recommendations.append({
                 "type": "keyword_action",
                 "action": action,
@@ -291,13 +352,25 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
                 "suggested": suggested,
                 "negative_keywords": target_negative_keywords,
                 "reason": f"Zero conversions from '{wasted['search_term']}', wasted RM {wasted['cost']:.2f}",
-                "expected_impact": f"Save RM {wasted['cost'] * 4:.2f}/month",
-                "how_to_apply": "Google Ads → Keywords → Select keyword → Add negative keywords"
+                "expected_impact": f"Save RM {impact_data['monthly_savings']:.2f}/month ({impact_data['confidence_pct']}% confidence)",
+                "how_to_apply": "Google Ads → Keywords → Select keyword → Add negative keywords",
+                "impact_data": impact_data,
+                "automation": automation,
             })
 
     # 7. QUALITY SCORE IMPROVEMENT RECOMMENDATIONS
     if qs_roadmap.get('improvement_plan'):
         for plan in qs_roadmap['improvement_plan'][:3]:
+            automation = get_automation_metadata('quality_improvement', platform='google')
+            impact_data = {
+                'monthly_savings': 0,
+                'additional_conversions_monthly': 0,
+                'confidence': 'moderate',
+                'confidence_pct': 60,
+                'formula': plan['expected_impact'],
+                'assumptions': ['Quality Score improvements require manual optimization', 'Results vary by implementation quality']
+            }
+
             recommendations.append({
                 "type": "quality_improvement",
                 "action": "improve_quality_score",
@@ -306,8 +379,10 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
                 "current": f"QS < 5 affecting {plan['affected_keywords']} keywords",
                 "suggested": plan['actions'][0] if plan['actions'] else "Review and optimize",
                 "reason": f"Priority {plan['priority']}: {plan['issue']} affecting {plan['affected_keywords']} keywords",
-                "expected_impact": plan['expected_impact'],
-                "campaign_ids": active_campaign_ids  # Add campaign IDs for automated application
+                "expected_impact": f"{plan['expected_impact']} ({impact_data['confidence_pct']}% confidence)",
+                "campaign_ids": active_campaign_ids,  # Add campaign IDs for automated application
+                "impact_data": impact_data,
+                "automation": automation,
             })
 
     # 8. GEOGRAPHIC RECOMMENDATIONS
