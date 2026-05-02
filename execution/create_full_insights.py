@@ -144,6 +144,8 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "action": "pause",
             "target": kw.get('resource_name', kw['keyword_text']),
             "keyword": kw['keyword_text'],
+            "campaign_name": kw.get('campaign_name', 'Unknown'),
+            "ad_group_name": kw.get('ad_group_name', 'Unknown'),
             "current": "ENABLED",
             "suggested": "PAUSED",
             "reason": f"Quality Score of {kw['quality_score']}, 0 conversions, RM {kw['cost']:.2f} wasted. CTR {kw['ctr']*100:.1f}%",
@@ -174,6 +176,8 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "type": "bid_adjustment",
             "target": kw.get('resource_name', kw['keyword_text']),
             "keyword": kw['keyword_text'],
+            "campaign_name": kw.get('campaign_name', 'Unknown'),
+            "ad_group_name": kw.get('ad_group_name', 'Unknown'),
             "current_bid": current_bid,
             "suggested_bid": suggested_bid,
             "reason": f"Strong performer: {int(kw['conversions'])} conversions at RM {kw.get('cost_per_conversion', 0):.2f} CPA. CTR {kw['ctr']*100:.1f}%",
@@ -204,6 +208,8 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             "type": "bid_adjustment",
             "target": kw.get('resource_name', kw['keyword_text']),
             "keyword": kw['keyword_text'],
+            "campaign_name": kw.get('campaign_name', 'Unknown'),
+            "ad_group_name": kw.get('ad_group_name', 'Unknown'),
             "current_bid": current_bid,
             "suggested_bid": suggested_bid,
             "reason": f"0 conversions despite RM {kw['cost']:.2f} spend. Reduce bid to test at lower position",
@@ -345,7 +351,9 @@ def create_enhanced_insights(metrics_file, output_insights, output_recommendatio
             recommendations.append({
                 "type": "keyword_action",
                 "action": action,
-                "target": wasted['ad_group'],  # Ad group name - for display purposes
+                "target": wasted.get('ad_group_name', 'Unknown'),  # Ad group name - for display purposes
+                "campaign_name": wasted.get('campaign_name', 'Unknown'),
+                "ad_group_name": wasted.get('ad_group_name', 'Unknown'),
                 "campaign_id": str(wasted.get('campaign_id', '')),  # Campaign ID - for apply_recommendations.py
                 "keyword": wasted['search_term'],
                 "current": "Broad match triggering irrelevant searches",

@@ -224,6 +224,8 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': 'More impressions and potential conversions',
                 'priority': 'medium',
                 'campaign_name': pacing['campaign_name'],
+                'campaign_id': pacing.get('campaign_id'),
+                'suggested_budget': round(pacing.get('daily_budget', pacing.get('spend', 0)) * 1.20, 2), # Suggest 20% increase
                 'impact_data': impact_data,
                 'automation': automation,
             }
@@ -246,6 +248,7 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': 'Better budget control',
                 'priority': 'low',
                 'campaign_name': pacing['campaign_name'],
+                'campaign_id': pacing.get('campaign_id'),
                 'impact_data': impact_data,
                 'automation': automation,
             }
@@ -322,6 +325,9 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': f"+{impact_data['additional_conversions_monthly']:.1f} conversions/month, +{currency} {impact_data.get('additional_revenue_monthly', 0):,.2f} revenue ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
                 'campaign_name': candidate['name'],
+                'campaign_id': candidate.get('campaign_id'),
+                'adset_id': candidate.get('adset_id'),
+                'suggested_budget': round(candidate.get('spend', 0) * 1.25, 2), # Suggest 25% increase
                 'impact_data': impact_data,
                 'automation': automation,
             }
@@ -339,6 +345,7 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
                 'expected_impact': f"Save {currency} {impact_data['monthly_savings']:,.2f} monthly or fix conversion tracking ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
                 'campaign_name': candidate['name'],
+                'campaign_id': candidate.get('campaign_id'),
                 'impact_data': impact_data,
                 'automation': automation,
             }
@@ -436,11 +443,14 @@ def generate_recommendations(metrics, audience_analysis, creative_analysis,
 
             rec = {
                 'type': 'roas_scaling',
-                'action': f"Scale {opp['name']} (ROAS {opp['roas']}x)",
+                'action': f"Scale budget for {opp['name']}",
                 'reason': f"Generating {currency} {opp['conversion_value']:,.2f} from {currency} {opp['spend']:,.2f} spend. "
                          f"ROAS {opp['roas']}x is highly profitable.",
                 'expected_impact': f"+{currency} {impact_data.get('additional_revenue_monthly', 0):,.2f} revenue/month ({impact_data['confidence_pct']}% confidence)",
                 'priority': 'high',
+                'campaign_name': opp['name'],
+                'campaign_id': opp.get('campaign_id'),
+                'suggested_budget': round(opp.get('spend', 0) * 1.25, 2), # Suggest 25% increase
                 'impact_data': impact_data,
                 'automation': automation,
             }

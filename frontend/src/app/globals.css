@@ -1,0 +1,39 @@
+/* Light Mode Refactor - Force Cache Clear */
+@import "tailwindcss";
+
+@theme {
+  --color-background: #F4F5F7;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F8F9FA;
+  --color-border: #E2E8F0;
+  
+  --color-foreground: #1A202C;
+  --color-text-muted: #718096;
+
+  /* Emitly Semantic Accents */
+  --color-accent-primary: #1E3F36; /* Dark Forest Green */
+  --color-accent-lime: #D7F7C2; /* Active Lime Green */
+  --color-accent-salmon: #FF8C73; /* Coral/Salmon Red */
+  
+  --color-accent-green: #38A169;
+  --color-accent-red: #E53E3E;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.12);
+  }
+}

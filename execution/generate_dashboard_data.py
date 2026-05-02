@@ -2,7 +2,7 @@
 Generate comprehensive dashboard data.json from metrics and insights
 """
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 import os
 
@@ -59,7 +59,11 @@ def generate_dashboard_data(metrics_file, recs_file, output_file):
         'customer_id': '7867388610',
         'account_name': 'YCK Chiropractic',
         'generated_at': datetime.now().isoformat(),
-        'date_range': metrics.get('date_range', {'start': '2024-12-29', 'end': '2025-01-28'}),
+        'date_range': metrics.get('date_range', {
+            'start_date': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
+            'end_date': datetime.now().strftime('%Y-%m-%d'),
+            'days': 30
+        }),
         'summary': {
             'total_spend': round(total_spend, 2),
             'total_impressions': total_impressions,
@@ -180,6 +184,22 @@ def generate_dashboard_data(metrics_file, recs_file, output_file):
     # Get campaign ID mapping for negative keyword recommendations
     campaign_id_map = {c.get('name', ''): c.get('id') for c in campaigns}
 
+    def format_currency(value):
+        return f"RM {value:.2f}"
+
+    def build_bid_copy(keyword_text, current_bid, suggested_bid):
+        if not current_bid or not suggested_bid:
+            return None, None
+        change_pct = ((suggested_bid - current_bid) / current_bid) * 100 if current_bid else 0
+        direction = "Increase" if suggested_bid > current_bid else "Decrease"
+        title = f"{direction} bid: {keyword_text}" if keyword_text else f"{direction} keyword bid"
+        suggested_action = (
+            f"{direction} max CPC bid from {format_currency(current_bid)} to "
+            f"{format_currency(suggested_bid)} ({change_pct:+.1f}%). "
+            "This updates the keyword-level bid in Google Ads; it does not pause the keyword or change match type."
+        )
+        return title, suggested_action
+
     for rec in recs_list[:8]:
         action = rec.get('action', 'review').replace('_', ' ').title()
         keyword = rec.get('keyword', '')
@@ -199,19 +219,44 @@ def generate_dashboard_data(metrics_file, recs_file, output_file):
 
         # Try to extract campaign_id from the recommendation
         campaign_name = rec.get('campaign_name', '') or rec.get('campaign', '')
+        ad_group_name = rec.get('ad_group_name', '') or rec.get('ad_group', '')
         campaign_id = rec.get('campaign_id') or campaign_id_map.get(campaign_name)
+
+        # Generate a stable ID for tracking - include more fields to avoid collisions
+        import hashlib
+        rec_id_raw = f"{action}_{keyword}_{target}_{campaign_id}_{ad_group_name}_{rec_type}"
+        rec_id = hashlib.md5(rec_id_raw.encode()).hexdigest()
+
+        title = f'{action}: {keyword}' if keyword else action
+        suggested_action = suggested
+
+        if action_type == 'bid_adjustment':
+            current_bid = rec.get('current_bid')
+            suggested_bid = rec.get('suggested_bid')
+            bid_title, bid_suggested_action = build_bid_copy(keyword, current_bid, suggested_bid)
+            if bid_title:
+                title = bid_title
+            if bid_suggested_action:
+                suggested_action = bid_suggested_action
 
         # Build recommendation object
         rec_obj = {
-            'title': f'{action}: {keyword}' if keyword else action,
+            'id': rec_id,
+            'recommendation_id': rec_id,
+            'title': title,
             'description': rec.get('reason', ''),
             'impact': 'High' if 'wasted' in rec.get('reason', '').lower() else 'Medium',
+            'expected_impact': rec.get('expected_impact') or rec.get('impact_text') or "Improved Performance",
             'action_type': action_type,
             'target_id': target,
             'keyword': keyword,
-            'suggested_action': suggested,
+            'suggested_action': suggested_action,
             'campaign_id': campaign_id,
-            'match_type': 'PHRASE'  # Default to phrase match for negative keywords
+            'campaign_name': campaign_name,
+            'ad_group_name': ad_group_name,
+            'match_type': 'PHRASE',  # Default to phrase match for negative keywords
+            'impact_data': rec.get('impact_data') or {},
+            'automation': rec.get('automation') or {},
         }
 
         # Add bid-related fields for bid_adjustment recommendations

@@ -105,6 +105,65 @@ def fetch_campaign_metrics(client, customer_id, start_date, end_date):
     return campaigns
 
 
+def fetch_campaign_daily_metrics(client, customer_id, start_date, end_date):
+    """Fetch campaign-level metrics segmented by date for fast dashboard filtering."""
+    ga_service = client.get_service("GoogleAdsService")
+
+    query = f"""
+        SELECT
+            segments.date,
+            campaign.id,
+            campaign.name,
+            campaign.status,
+            campaign.advertising_channel_type,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.ctr,
+            metrics.average_cpc,
+            metrics.cost_micros,
+            metrics.conversions,
+            metrics.conversions_value,
+            metrics.cost_per_conversion,
+            metrics.value_per_conversion
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+            AND campaign.status != 'REMOVED'
+        ORDER BY segments.date DESC, metrics.impressions DESC
+    """
+
+    rows = []
+    try:
+        response = ga_service.search_stream(customer_id=customer_id, query=query)
+
+        for batch in response:
+            for row in batch.results:
+                cost = row.metrics.cost_micros / 1_000_000
+                conversions = row.metrics.conversions
+                rows.append({
+                    "date": row.segments.date,
+                    "id": row.campaign.id,
+                    "name": row.campaign.name,
+                    "status": row.campaign.status.name,
+                    "type": row.campaign.advertising_channel_type.name,
+                    "impressions": row.metrics.impressions,
+                    "clicks": row.metrics.clicks,
+                    "ctr": row.metrics.ctr,
+                    "avg_cpc": row.metrics.average_cpc / 1_000_000,
+                    "cost": cost,
+                    "conversions": conversions,
+                    "conversion_value": row.metrics.conversions_value,
+                    "cost_per_conversion": cost / conversions if conversions > 0 else 0,
+                    "value_per_conversion": row.metrics.value_per_conversion,
+                    "roas": row.metrics.conversions_value / cost if cost > 0 else 0,
+                })
+
+    except GoogleAdsException as ex:
+        print(f"Daily campaign metrics failed: {ex.error.code().name}")
+        return []
+
+    return rows
+
+
 def fetch_adgroup_metrics(client, customer_id, start_date, end_date):
     """Fetch ad group-level performance metrics."""
     ga_service = client.get_service("GoogleAdsService")
@@ -648,6 +707,9 @@ def main():
     print("  - Fetching campaign metrics...")
     campaigns = fetch_campaign_metrics(client, args.customer_id, args.start_date, args.end_date)
 
+    print("  - Fetching daily campaign metrics...")
+    campaign_daily = fetch_campaign_daily_metrics(client, args.customer_id, args.start_date, args.end_date)
+
     print("  - Fetching ad group metrics...")
     ad_groups = fetch_adgroup_metrics(client, args.customer_id, args.start_date, args.end_date)
 
@@ -669,18 +731,20 @@ def main():
     # Compile all data
     metrics_data = {
         "customer_id": args.customer_id,
-        "date_range": {
-            "start_date": args.start_date,
-            "end_date": args.end_date
-        },
         "fetched_at": datetime.now().isoformat(),
         "campaigns": campaigns,
+        "campaign_daily": campaign_daily,
         "ad_groups": ad_groups,
         "keywords": keywords,
         "ads": ads,
         "search_queries": search_queries,
         "geo_performance": geo_performance,
         "time_performance": time_performance,
+        "date_range": {
+            "start_date": args.start_date,
+            "end_date": args.end_date,
+            "days": (datetime.strptime(args.end_date, "%Y-%m-%d") - datetime.strptime(args.start_date, "%Y-%m-%d")).days
+        },
         "summary": {
             "total_campaigns": len(campaigns),
             "total_ad_groups": len(ad_groups),
@@ -689,6 +753,7 @@ def main():
             "total_search_queries": len(search_queries),
             "total_geo_locations": len(geo_performance),
             "total_time_segments": len(time_performance),
+            "total_campaign_daily_rows": len(campaign_daily),
             "total_impressions": sum(c["impressions"] for c in campaigns),
             "total_clicks": sum(c["clicks"] for c in campaigns),
             "total_cost": sum(c["cost"] for c in campaigns),

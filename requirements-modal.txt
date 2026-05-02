@@ -1,0 +1,13 @@
+# Minimal requirements for Modal cloud deployment
+# Google Ads API
+google-ads>=28.0.0
+
+# Facebook/Meta Ads API
+facebook-business>=19.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.31.0
+fastapi
+uvicorn
+pydantic

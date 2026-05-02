@@ -269,6 +269,7 @@ def analyze_budget_pacing(campaigns, days_in_range):
             utilization = (camp_daily_avg / daily_budget) * 100
             pacing_details.append({
                 'campaign_name': camp.get('campaign_name', ''),
+                'campaign_id': camp.get('campaign_id'),
                 'budget_type': 'daily',
                 'budget': daily_budget,
                 'avg_daily_spend': round(camp_daily_avg, 2),
@@ -281,6 +282,7 @@ def analyze_budget_pacing(campaigns, days_in_range):
             utilization = (camp_spend / lifetime_budget) * 100
             pacing_details.append({
                 'campaign_name': camp.get('campaign_name', ''),
+                'campaign_id': camp.get('campaign_id'),
                 'budget_type': 'lifetime',
                 'budget': lifetime_budget,
                 'total_spend': round(camp_spend, 2),
@@ -526,6 +528,7 @@ def analyze_top_performers(campaigns, ad_sets):
         if conversions > 0 and cpa < avg_cpa * 0.8 and conv_rate > 3:
             scale_candidates.append({
                 'name': camp.get('campaign_name', ''),
+                'campaign_id': camp.get('campaign_id'),
                 'level': 'campaign',
                 'spend': round(spend, 2),
                 'conversions': conversions,
@@ -536,6 +539,7 @@ def analyze_top_performers(campaigns, ad_sets):
         elif spend > 50 and conversions == 0:
             review_candidates.append({
                 'name': camp.get('campaign_name', ''),
+                'campaign_id': camp.get('campaign_id'),
                 'level': 'campaign',
                 'spend': round(spend, 2),
                 'clicks': clicks,
@@ -557,6 +561,7 @@ def analyze_top_performers(campaigns, ad_sets):
         if conversions > 0 and cpa < avg_cpa * 0.7 and conv_rate > 3:
             scale_candidates.append({
                 'name': adset.get('adset_name', ''),
+                'adset_id': adset.get('adset_id'),
                 'level': 'ad_set',
                 'campaign': adset.get('campaign_name', ''),
                 'spend': round(spend, 2),
